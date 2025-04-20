@@ -33,17 +33,35 @@ export default function Home() {
   useEffect(() => {
     audioRecorderRef.current = new RealtimeAudioRecorder()
 
-    audioRecorderRef.current.onTranscript((text, isFinal) => {
-      // リアルタイムで文字起こしを更新
-      if (text) {
-        handleTranscriptReceived(text, isFinal)
+    audioRecorderRef.current.onMessage((data) => {
+      console.log("Received data from backend:", data)
+      if (data.type === 'completed') {
+        // バックエンドから受け取ったデータでUIを更新
+        setText(data.modified_text)
+        setSuggestion(data.edit_plan) // 修正方針を表示
+        setTranscript(data.utterance) // 発話内容を表示（一時的）
+
+        // 元のテキストがなければ設定（初回など）
+        if (!originalText && data.original_text) {
+          setOriginalText(data.original_text)
+        }
+        // 比較セクションを表示
+        setShowComparison(true)
+      } else {
+        // 必要に応じて他のメッセージタイプも処理
+        console.log("Received unexpected message type:", data.type)
       }
     })
 
-    audioRecorderRef.current.onError((error) => {
-      console.error("Recording error:", error)
-      setRecordingError(`録音エラー: ${error.message}`)
+    audioRecorderRef.current.onError((event) => {
+      console.error("WebSocket error:", event)
+      setRecordingError(`WebSocket接続エラーが発生しました。バックエンドサーバーが起動しているか確認してください。`)
       stopRecording()
+      toast({
+        title: "WebSocketエラー",
+        description: "バックエンドとの接続に失敗しました。",
+        variant: "destructive",
+      })
     })
 
     return () => {
@@ -51,139 +69,111 @@ export default function Home() {
         audioRecorderRef.current.stop()
       }
     }
-  }, [])
+  }, [originalText]) // originalTextを依存配列に追加
 
-  // 文字起こし結果を処理する関数
-  const handleTranscriptReceived = async (newTranscript: string, isFinal: boolean) => {
-    // 現在の文字起こしを表示
-    setTranscript(newTranscript)
+  // 文字起こし結果を処理する関数 (バックエンド処理に変更したため不要)
+  // const handleTranscriptReceived = async (newTranscript: string, isFinal: boolean) => { ... }
 
-    // 最終結果の場合のみ処理
-    if (isFinal) {
-      // 文字起こしを蓄積
-      accumulatedTranscriptRef.current += " " + newTranscript
-
-      // フィードバックかどうかをチェック
-      setIsCheckingFeedback(true)
-      try {
-        const containsFeedback = await isFeedback(accumulatedTranscriptRef.current, text)
-
-        if (containsFeedback) {
-          // フィードバックが含まれている場合、処理を開始
-          processUserFeedback(accumulatedTranscriptRef.current)
-          // 蓄積をリセット
-          accumulatedTranscriptRef.current = ""
-        } else {
-          // フィードバックではない場合、蓄積を続ける
-          console.log("Accumulated transcript (not feedback yet):", accumulatedTranscriptRef.current)
-        }
-      } catch (error) {
-        console.error("Error checking feedback:", error)
-      } finally {
-        setIsCheckingFeedback(false)
-      }
-    }
-  }
-
-  const toggleMode = () => {
+  const toggleMode = async () => {
     if (mode === "correction") {
       // 修正モードから編集モードに切り替える場合は録音を停止
       stopRecording()
       setMode("edit")
+      // 状態リセット
+      setRecordingError(null)
+      setApiError(null)
+      setShowComparison(false)
+      setSuggestion(null)
+      setTranscript("") // 発話内容もクリア
     } else {
       // 編集モードから修正モードに切り替える場合
-      setMode("correction")
-      // 修正モードに切り替えたら自動的に録音を開始
-      setTimeout(() => startRecording(), 100) // 少し遅延させて状態の更新を確実にする
+      if (!text.trim()) {
+        toast({
+          title: "テキスト未入力",
+          description: "修正モードに切り替える前にテキストを入力してください。",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setIsProcessing(true) // 処理中表示を開始
+      setApiError(null)
+      try {
+        // 1. バックエンドに現在のテキストを送信
+        const response = await fetch('http://localhost:8000/api/display-text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: text }),
+        })
+
+        if (response.ok) {
+          // 2. 成功したら状態を更新し、WebSocket接続を開始
+          setOriginalText(text) // 元のテキストを保持
+          setMode("correction")
+          // WebSocket接続を少し遅延させて開始
+          setTimeout(() => startRecording(), 100)
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.detail || "テキストの設定に失敗しました。"
+          setApiError(`APIエラー: ${errorMessage}`)
+          toast({
+            title: "エラー",
+            description: errorMessage,
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error setting display text:", error)
+        const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
+        setApiError(`通信エラー: ${errorMessage}`)
+        toast({
+          title: "通信エラー",
+          description: "バックエンドとの通信に失敗しました。",
+          variant: "destructive",
+        })
+      } finally {
+        setIsProcessing(false) // 処理中表示を終了
+      }
     }
-    setRecordingError(null)
-    setApiError(null)
-    setShowComparison(false)
-    setSuggestion(null)
-    accumulatedTranscriptRef.current = ""
+    // 共通の状態リセット (モード切替成功時以外でも必要ならここに移動)
+    // setRecordingError(null)
+    // setShowComparison(false)
+    // setSuggestion(null)
+    // accumulatedTranscriptRef.current = ""
   }
 
   const startRecording = async () => {
     try {
       setRecordingError(null)
       setApiError(null)
-      setTranscript("")
-      setSuggestion(null)
-      accumulatedTranscriptRef.current = ""
+      // setTranscript("") // 開始時に文字起こしをクリアしない
+      // setSuggestion(null) // 開始時に修正方針をクリアしない
+      // accumulatedTranscriptRef.current = "" // 蓄積は不要
 
       if (audioRecorderRef.current) {
-        await audioRecorderRef.current.start()
+        audioRecorderRef.current.start() // バックエンドへの接続を開始
         setIsRecording(true)
-        console.log("Recording started")
+        console.log("WebSocket connection initiated")
       }
     } catch (error) {
-      console.error("Failed to start recording:", error)
-      if (error instanceof Error) {
-        setRecordingError(`録音開始エラー: ${error.message}`)
-      } else {
-        setRecordingError("録音を開始できませんでした")
-      }
-      toast({
-        title: "エラー",
-        description: "録音を開始できませんでした。",
-        variant: "destructive",
-      })
+      console.error("Failed to start WebSocket connection:", error)
+      // エラーハンドリングはonErrorコールバックに集約
     }
   }
 
   const stopRecording = () => {
     if (audioRecorderRef.current?.isActive()) {
       audioRecorderRef.current.stop()
-      console.log("Recording stopped")
-
-      // 蓄積した文字起こしがあれば処理
-      if (accumulatedTranscriptRef.current.trim()) {
-        handleTranscriptReceived(accumulatedTranscriptRef.current, true)
-      }
+      console.log("WebSocket connection stopped")
     }
-
     setIsRecording(false)
+    // 文字起こし関連の処理は不要
   }
 
-  const processUserFeedback = async (feedback: string) => {
-    if (!feedback.trim() || !text.trim()) return
-
-    setIsProcessing(true)
-    setApiError(null)
-
-    try {
-      // 元のテキストを保存
-      setOriginalText(text)
-
-      // 修正提案を生成
-      const suggestionText = await generateCorrectionSuggestion(text, feedback)
-      setSuggestion(suggestionText)
-
-      // 修正を適用
-      const result = await applyCorrectionSuggestion(text, suggestionText, feedback)
-
-      // 修正後のテキストを設定
-      setText(result)
-
-      // 比較セクションを表示
-      setShowComparison(true)
-
-      setTranscript("")
-    } catch (error: any) {
-      console.error("Error processing correction:", error)
-
-      // APIエラーメッセージを設定
-      setApiError(error.message || "テキストの処理中にエラーが発生しました")
-
-      toast({
-        title: "エラーが発生しました",
-        description: error.message || "テキストの処理中にエラーが発生しました。もう一度お試しください。",
-        variant: "destructive",
-      })
-    } finally {
-      setIsProcessing(false)
-    }
-  }
+  // processUserFeedback はバックエンドで行われるため不要
+  // const processUserFeedback = async (feedback: string) => { ... }
 
   const toggleComparison = () => {
     setShowComparison(!showComparison)
@@ -265,7 +255,7 @@ export default function Home() {
                   onChange={(e) => setText(e.target.value)}
                 />
               ) : (
-                <div className="border rounded-md p-3 min-h-[200px] bg-white">
+                <div className="border rounded-md p-3 min-h-[200px] bg-white whitespace-pre-wrap break-words">
                   {text || <span className="text-muted-foreground">ここに商品説明が表示されます...</span>}
                 </div>
               )}
