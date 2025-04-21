@@ -31,6 +31,7 @@ export default function Home() {
   const accumulatedTranscriptRef = useRef<string>("")
 
   const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([])
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // AudioRecorderの初期化
   useEffect(() => {
@@ -214,6 +215,23 @@ export default function Home() {
     return originalText
   }
 
+  // テキストエリアの高さを自動調整する関数
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }
+
+  // テキストが変更されたとき、またはモードが変更されたときに高さを調整
+  useEffect(() => {
+    // 編集モードの場合のみ高さを調整
+    if (mode === "edit") {
+      // 少し遅延を入れて実行（DOMの更新後に確実に実行されるようにするため）
+      setTimeout(adjustTextareaHeight, 0)
+    }
+  }, [text, mode])
+
   return (
     <main className="container mx-auto py-8 px-4">
       <Card className="max-w-3xl mx-auto">
@@ -285,10 +303,14 @@ export default function Home() {
             <div className="relative">
               {mode === "edit" ? (
                 <Textarea
+                  ref={textareaRef}
                   placeholder="ここに商品説明を入力してください..."
-                  className="min-h-[200px]"
+                  className="min-h-[200px] overflow-hidden"
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => {
+                    setText(e.target.value)
+                    adjustTextareaHeight()
+                  }}
                 />
               ) : (
                 <div className="border rounded-md p-3 min-h-[200px] bg-white whitespace-pre-wrap break-words">
