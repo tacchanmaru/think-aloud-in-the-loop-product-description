@@ -46,6 +46,10 @@ export default function Home() {
         if (!originalText && data.original_text) {
           setOriginalText(data.original_text)
         }
+        // history_summaryをコンソールに表示
+        if (data.history_summary) {
+          console.log("Current constraints:", data.history_summary)
+        }
       } else if (data.type === 'modification_complete') {
         // 修正完了時の処理
         setText(data.modified_text)
@@ -56,6 +60,10 @@ export default function Home() {
         }
         // 履歴を保存
         setHistory(data.history)
+        // history_summaryをコンソールに表示
+        if (data.history_summary) {
+          console.log("Updated constraints:", data.history_summary)
+        }
         // 比較セクションを表示
         setShowComparison(true)
       } else {
