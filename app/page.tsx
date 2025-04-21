@@ -25,9 +25,12 @@ export default function Home() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [isCheckingFeedback, setIsCheckingFeedback] = useState(false)
+  const suggestionTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null)
   const accumulatedTranscriptRef = useRef<string>("")
+
+  const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([])
 
   // AudioRecorderの初期化
   useEffect(() => {
@@ -35,16 +38,24 @@ export default function Home() {
 
     audioRecorderRef.current.onMessage((data) => {
       console.log("Received data from backend:", data)
-      if (data.type === 'completed') {
-        // バックエンドから受け取ったデータでUIを更新
-        setText(data.modified_text)
-        setSuggestion(data.edit_plan) // 修正方針を表示
-        setTranscript(data.utterance) // 発話内容を表示（一時的）
-
+      if (data.type === 'edit_plan') {
+        // 修正プランを先に表示
+        setSuggestion(data.edit_plan)
+        setTranscript(data.utterance)
         // 元のテキストがなければ設定（初回など）
         if (!originalText && data.original_text) {
           setOriginalText(data.original_text)
         }
+      } else if (data.type === 'modification_complete') {
+        // 修正完了時の処理
+        setText(data.modified_text)
+        setTranscript(data.utterance)
+        // 元のテキストがなければ設定（初回など）
+        if (!originalText && data.original_text) {
+          setOriginalText(data.original_text)
+        }
+        // 履歴を保存
+        setHistory(data.history)
         // 比較セクションを表示
         setShowComparison(true)
       } else {
@@ -179,6 +190,22 @@ export default function Home() {
     setShowComparison(!showComparison)
   }
 
+  // Add auto-resize effect for suggestion textarea
+  useEffect(() => {
+    if (suggestionTextareaRef.current && suggestion) {
+      suggestionTextareaRef.current.style.height = 'auto'
+      suggestionTextareaRef.current.style.height = `${suggestionTextareaRef.current.scrollHeight}px`
+    }
+  }, [suggestion])
+
+  // 直前のテキストを取得する関数
+  const getPreviousText = () => {
+    if (history.length >= 2) {
+      return history[history.length - 2].modified_text
+    }
+    return originalText
+  }
+
   return (
     <main className="container mx-auto py-8 px-4">
       <Card className="max-w-3xl mx-auto">
@@ -239,9 +266,10 @@ export default function Home() {
               <div className="mb-4">
                 <div className="text-sm font-medium mb-2">修正提案:</div>
                 <Textarea
+                  ref={suggestionTextareaRef}
                   value={suggestion}
                   readOnly
-                  className="min-h-[80px] bg-blue-50 text-blue-800 border-blue-200"
+                  className="bg-blue-50 text-blue-800 border-blue-200 min-h-[120px]"
                 />
               </div>
             )}
@@ -278,15 +306,15 @@ export default function Home() {
                     <TabsContent value="side-by-side" className="p-0">
                       <div className="grid grid-cols-2 divide-x">
                         <div className="p-3 bg-red-50">
-                          <div className="text-xs font-medium mb-1 text-red-800">編集前</div>
+                          <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
                           <div className="whitespace-pre-wrap break-words text-sm">
-                            {originalText || <span className="text-muted-foreground">元のテキストはありません</span>}
+                            {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
                           </div>
                         </div>
                         <div className="p-3 bg-green-50">
-                          <div className="text-xs font-medium mb-1 text-green-800">編集後</div>
+                          <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
                           <div className="whitespace-pre-wrap break-words text-sm">
-                            {text || <span className="text-muted-foreground">編集後のテキストはありません</span>}
+                            {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
                           </div>
                         </div>
                       </div>
@@ -294,11 +322,11 @@ export default function Home() {
                     <TabsContent value="unified" className="p-0">
                       <div className="p-3">
                         <div className="text-xs font-medium mb-2">変更点</div>
-                        {originalText === text ? (
+                        {getPreviousText() === text ? (
                           <div className="text-sm text-muted-foreground">変更はありません</div>
                         ) : (
                           <div className="text-sm">
-                            {originalText.split("\n").map((line, i) => (
+                            {getPreviousText().split("\n").map((line, i) => (
                               <div key={`old-${i}`} className="bg-red-50 text-red-800 p-1 mb-1 rounded">
                                 - {line}
                               </div>
