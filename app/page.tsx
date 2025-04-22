@@ -424,6 +424,16 @@ export default function Home() {
               </div>
             ) : (
               <>
+                {imagePreview && (
+                  <div className="text-center mb-4">
+                    <img
+                      src={imagePreview}
+                      alt="商品画像"
+                      className="max-w-[300px] mx-auto rounded-lg"
+                    />
+                  </div>
+                )}
+
                 {mode === "correction" && (
                   <div className="flex flex-col space-y-2">
                     <div className="flex items-center justify-between">
