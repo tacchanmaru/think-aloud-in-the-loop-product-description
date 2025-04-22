@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,8 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RealtimeAudioRecorder } from "@/lib/realtime-audio-recorder"
 
 export default function Home() {
+  const router = useRouter()
   const { toast } = useToast()
   const [mode, setMode] = useState<"upload" | "edit" | "correction">("upload")
+  const [userId, setUserId] = useState<string | null>(null)
   const [text, setText] = useState("")
   const [originalText, setOriginalText] = useState("")
   const [isRecording, setIsRecording] = useState(false)
@@ -34,6 +37,16 @@ export default function Home() {
 
   const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // ユーザー認証チェック
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("userId")
+    if (!storedUserId) {
+      router.push("/login")
+    } else {
+      setUserId(storedUserId)
+    }
+  }, [router])
 
   // AudioRecorderの初期化
   useEffect(() => {
@@ -97,101 +110,136 @@ export default function Home() {
   // const handleTranscriptReceived = async (newTranscript: string, isFinal: boolean) => { ... }
 
   const toggleMode = async () => {
-    if (mode === "correction") {
-      // 修正モードから編集モードに切り替える場合は録音を停止
-      stopRecording()
-      setMode("edit")
-      // 状態リセット
-      setRecordingError(null)
-      setApiError(null)
-      setShowComparison(false)
-      setSuggestion(null)
-      setTranscript("") // 発話内容もクリア
-    } else {
-      // 編集モードから修正モードに切り替える場合
-      if (!text.trim()) {
-        toast({
-          title: "テキスト未入力",
-          description: "修正モードに切り替える前にテキストを入力してください。",
-          variant: "destructive",
-        })
-        return
+    try {
+      if (!userId) {
+        throw new Error("ユーザーIDが見つかりません")
       }
 
-      setIsProcessing(true) // 処理中表示を開始
-      setApiError(null)
-      try {
-        // 1. バックエンドに現在のテキストを送信
-        const response = await fetch('http://localhost:8000/api/display-text', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text: text }),
+      if (!text) {
+        throw new Error("テキストが入力されていません")
+      }
+
+      const response = await fetch("http://localhost:8000/api/display-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: text,
+          user_id: userId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "サーバーエラーが発生しました")
+      }
+
+      const data = await response.json()
+      setOriginalText(data.text)
+      
+      // 現在のモードを確認して切り替え
+      const newMode = mode === "edit" ? "correction" : "edit"
+      setMode(newMode)
+
+      // 修正モードに切り替える場合は WebSocket を初期化
+      if (newMode === "correction") {
+        // 既存の WebSocket 接続を閉じる
+        if (audioRecorderRef.current?.isActive()) {
+          await audioRecorderRef.current.stop()
+        }
+        // 新しい WebSocket 接続を初期化
+        audioRecorderRef.current = new RealtimeAudioRecorder()
+        audioRecorderRef.current.onMessage((data) => {
+          console.log("Received data from backend:", data)
+          if (data.type === 'edit_plan') {
+            setSuggestion(data.edit_plan)
+            setTranscript(data.utterance)
+            if (!originalText && data.original_text) {
+              setOriginalText(data.original_text)
+            }
+            if (data.history_summary) {
+              console.log("Current constraints:", data.history_summary)
+            }
+          } else if (data.type === 'modification_complete') {
+            setText(data.modified_text)
+            setTranscript(data.utterance)
+            if (!originalText && data.original_text) {
+              setOriginalText(data.original_text)
+            }
+            setHistory(data.history)
+            if (data.history_summary) {
+              console.log("Updated constraints:", data.history_summary)
+            }
+            setShowComparison(true)
+          } else {
+            console.log("Received unexpected message type:", data.type)
+          }
         })
 
-        if (response.ok) {
-          // 2. 成功したら状態を更新し、WebSocket接続を開始
-          setOriginalText(text) // 元のテキストを保持
-          setMode("correction")
-          // WebSocket接続を少し遅延させて開始
-          setTimeout(() => startRecording(), 100)
-        } else {
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage = errorData.detail || "テキストの設定に失敗しました。"
-          setApiError(`APIエラー: ${errorMessage}`)
+        audioRecorderRef.current.onError((event) => {
+          console.error("WebSocket error:", event)
+          setRecordingError(`WebSocket接続エラーが発生しました。バックエンドサーバーが起動しているか確認してください。`)
+          stopRecording()
           toast({
-            title: "エラー",
-            description: errorMessage,
+            title: "WebSocketエラー",
+            description: "バックエンドとの接続に失敗しました。",
             variant: "destructive",
           })
-        }
-      } catch (error) {
-        console.error("Error setting display text:", error)
-        const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
-        setApiError(`通信エラー: ${errorMessage}`)
-        toast({
-          title: "通信エラー",
-          description: "バックエンドとの通信に失敗しました。",
-          variant: "destructive",
         })
-      } finally {
-        setIsProcessing(false) // 処理中表示を終了
       }
+    } catch (error) {
+      console.error("Error toggling mode:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      toast({
+        title: "エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
     }
-    // 共通の状態リセット (モード切替成功時以外でも必要ならここに移動)
-    // setRecordingError(null)
-    // setShowComparison(false)
-    // setSuggestion(null)
-    // accumulatedTranscriptRef.current = ""
   }
 
   const startRecording = async () => {
     try {
       setRecordingError(null)
       setApiError(null)
-      // setTranscript("") // 開始時に文字起こしをクリアしない
-      // setSuggestion(null) // 開始時に修正方針をクリアしない
-      // accumulatedTranscriptRef.current = "" // 蓄積は不要
 
-      if (audioRecorderRef.current) {
-        audioRecorderRef.current.start() // バックエンドへの接続を開始
+      if (audioRecorderRef.current && userId) {
+        await audioRecorderRef.current.start(userId)
         setIsRecording(true)
         console.log("WebSocket connection initiated")
       }
     } catch (error) {
       console.error("Failed to start WebSocket connection:", error)
-      // エラーハンドリングはonErrorコールバックに集約
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      setRecordingError(errorMessage)
+      toast({
+        title: "録音エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      setIsRecording(false)
     }
   }
 
-  const stopRecording = () => {
-    if (audioRecorderRef.current?.isActive()) {
-      audioRecorderRef.current.stop()
-      console.log("WebSocket connection stopped")
+  const stopRecording = async () => {
+    try {
+      if (!audioRecorderRef.current) {
+        throw new Error("録音機能が初期化されていません")
+      }
+
+      await audioRecorderRef.current.stop()
+      setIsRecording(false)
+    } catch (error) {
+      console.error("Error stopping recording:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      toast({
+        title: "録音エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      setIsRecording(false)
     }
-    setIsRecording(false)
-    // 文字起こし関連の処理は不要
   }
 
   // processUserFeedback はバックエンドで行われるため不要
@@ -236,7 +284,7 @@ export default function Home() {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file || !userId) return
 
     // プレビュー表示
     const reader = new FileReader()
@@ -251,6 +299,7 @@ export default function Home() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('user_id', userId)
 
       const response = await fetch('http://localhost:8000/api/generate-description', {
         method: 'POST',
@@ -267,22 +316,53 @@ export default function Home() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ text: result.description }),
+          body: JSON.stringify({ 
+            text: result.description,
+            user_id: userId,
+          }),
         })
 
         if (textResponse.ok) {
           setMode('edit')
         } else {
-          setApiError('テキストの設定に失敗しました')
+          const errorMessage = "テキストの設定に失敗しました"
+          setApiError(errorMessage)
+          toast({
+            title: "エラー",
+            description: errorMessage,
+            variant: "destructive",
+          })
         }
       } else {
-        setApiError(`説明文の生成に失敗しました: ${result.error}`)
+        const errorMessage = `説明文の生成に失敗しました: ${result.error}`
+        setApiError(errorMessage)
+        toast({
+          title: "エラー",
+          description: errorMessage,
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      setApiError(`エラーが発生しました: ${error instanceof Error ? error.message : String(error)}`)
+      const errorMessage = `エラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
+      setApiError(errorMessage)
+      toast({
+        title: "エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setIsUploading(false)
     }
+  }
+
+  // ログアウト処理を追加
+  const handleLogout = () => {
+    localStorage.removeItem("userId")
+    router.push("/login")
+  }
+
+  if (!userId) {
+    return null // または loading spinner
   }
 
   return (
@@ -344,6 +424,16 @@ export default function Home() {
               </div>
             ) : (
               <>
+                {imagePreview && (
+                  <div className="text-center mb-4">
+                    <img
+                      src={imagePreview}
+                      alt="商品画像"
+                      className="max-w-[300px] mx-auto rounded-lg"
+                    />
+                  </div>
+                )}
+
                 {mode === "correction" && (
                   <div className="flex flex-col space-y-2">
                     <div className="flex items-center justify-between">
