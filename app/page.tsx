@@ -14,7 +14,7 @@ import { RealtimeAudioRecorder } from "@/lib/realtime-audio-recorder"
 
 export default function Home() {
   const { toast } = useToast()
-  const [mode, setMode] = useState<"edit" | "correction">("edit")
+  const [mode, setMode] = useState<"upload" | "edit" | "correction">("upload")
   const [text, setText] = useState("")
   const [originalText, setOriginalText] = useState("")
   const [isRecording, setIsRecording] = useState(false)
@@ -25,6 +25,8 @@ export default function Home() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [isCheckingFeedback, setIsCheckingFeedback] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const suggestionTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null)
@@ -232,151 +234,252 @@ export default function Home() {
     }
   }, [text, mode])
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // プレビュー表示
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    setIsUploading(true)
+    setApiError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('http://localhost:8000/api/generate-description', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setText(result.description)
+        // バックエンドに現在のテキストを送信
+        const textResponse = await fetch('http://localhost:8000/api/display-text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: result.description }),
+        })
+
+        if (textResponse.ok) {
+          setMode('edit')
+        } else {
+          setApiError('テキストの設定に失敗しました')
+        }
+      } else {
+        setApiError(`説明文の生成に失敗しました: ${result.error}`)
+      }
+    } catch (error) {
+      setApiError(`エラーが発生しました: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   return (
     <main className="container mx-auto py-8 px-4">
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>メルカリ商品説明ジェネレーター</CardTitle>
-            <Button variant={mode === "edit" ? "outline" : "default"} onClick={toggleMode}>
-              {mode === "edit" ? "修正モードに切り替え" : "編集モードに切り替え"}
-            </Button>
+            {mode !== "upload" && (
+              <Button variant={mode === "edit" ? "outline" : "default"} onClick={toggleMode}>
+                {mode === "edit" ? "修正モードに切り替え" : "編集モードに切り替え"}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {mode === "correction" && (
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className={isRecording ? "bg-red-100" : ""}>
-                    {isRecording ? "音声認識中..." : "録音停止中"}
-                    {isCheckingFeedback && " (フィードバック判定中...)"}
-                  </Badge>
-                  <Button variant="outline" size="sm" onClick={isRecording ? stopRecording : startRecording}>
-                    {isRecording ? <MicOff className="h-4 w-4 mr-2" /> : <Mic className="h-4 w-4 mr-2" />}
-                    {isRecording ? "録音停止" : "録音開始"}
-                  </Button>
-                </div>
-
-                {recordingError && (
-                  <Alert variant="destructive" className="py-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{recordingError}</AlertDescription>
-                  </Alert>
-                )}
-
-                {transcript && (
-                  <div className="bg-muted p-3 rounded-md text-sm">
-                    <p className="font-semibold mb-1">あなたの発話:</p>
-                    <p className="whitespace-pre-wrap break-words">{transcript}</p>
+            {mode === "upload" ? (
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="imageInput"
+                  />
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => document.getElementById('imageInput')?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          画像をアップロード中...
+                        </>
+                      ) : (
+                        '商品画像を選択'
+                      )}
+                    </Button>
+                    {imagePreview && (
+                      <div className="mt-4">
+                        <img
+                          src={imagePreview}
+                          alt="プレビュー"
+                          className="max-w-[300px] mx-auto rounded-lg"
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-
+                </div>
                 {apiError && (
-                  <Alert variant="destructive" className="py-2">
+                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{apiError}</AlertDescription>
                   </Alert>
                 )}
+              </div>
+            ) : (
+              <>
+                {mode === "correction" && (
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className={isRecording ? "bg-red-100" : ""}>
+                        {isRecording ? "音声認識中..." : "録音停止中"}
+                        {isCheckingFeedback && " (フィードバック判定中...)"}
+                      </Badge>
+                      <Button variant="outline" size="sm" onClick={isRecording ? stopRecording : startRecording}>
+                        {isRecording ? <MicOff className="h-4 w-4 mr-2" /> : <Mic className="h-4 w-4 mr-2" />}
+                        {isRecording ? "録音停止" : "録音開始"}
+                      </Button>
+                    </div>
 
-                {isProcessing && (
-                  <div className="flex items-center justify-center py-2">
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    <span>処理中...</span>
+                    {recordingError && (
+                      <Alert variant="destructive" className="py-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{recordingError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {transcript && (
+                      <div className="bg-muted p-3 rounded-md text-sm">
+                        <p className="font-semibold mb-1">あなたの発話:</p>
+                        <p className="whitespace-pre-wrap break-words">{transcript}</p>
+                      </div>
+                    )}
+
+                    {apiError && (
+                      <Alert variant="destructive" className="py-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{apiError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {isProcessing && (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        <span>処理中...</span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {suggestion && mode === "correction" && (
-              <div className="mb-4">
-                <div className="text-sm font-medium mb-2">修正提案:</div>
-                <Textarea
-                  ref={suggestionTextareaRef}
-                  value={suggestion}
-                  readOnly
-                  className="bg-blue-50 text-blue-800 border-blue-200 min-h-[120px]"
-                />
-              </div>
-            )}
+                {suggestion && mode === "correction" && (
+                  <div className="mb-4">
+                    <div className="text-sm font-medium mb-2">修正提案:</div>
+                    <Textarea
+                      ref={suggestionTextareaRef}
+                      value={suggestion}
+                      readOnly
+                      className="bg-blue-50 text-blue-800 border-blue-200 min-h-[120px]"
+                    />
+                  </div>
+                )}
 
-            <div className="relative">
-              {mode === "edit" ? (
-                <Textarea
-                  ref={textareaRef}
-                  placeholder="ここに商品説明を入力してください..."
-                  className="min-h-[200px] overflow-hidden"
-                  value={text}
-                  onChange={(e) => {
-                    setText(e.target.value)
-                    adjustTextareaHeight()
-                  }}
-                />
-              ) : (
-                <div className="border rounded-md p-3 min-h-[200px] bg-white whitespace-pre-wrap break-words">
-                  {text || <span className="text-muted-foreground">ここに商品説明が表示されます...</span>}
+                <div className="relative">
+                  {mode === "edit" ? (
+                    <Textarea
+                      ref={textareaRef}
+                      placeholder="ここに商品説明を入力してください..."
+                      className="min-h-[200px] overflow-hidden"
+                      value={text}
+                      onChange={(e) => {
+                        setText(e.target.value)
+                        adjustTextareaHeight()
+                      }}
+                    />
+                  ) : (
+                    <div className="border rounded-md p-3 min-h-[200px] bg-white whitespace-pre-wrap break-words">
+                      {text || <span className="text-muted-foreground">ここに商品説明が表示されます...</span>}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {showComparison && mode === "correction" && (
-              <div className="mt-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium">変更内容</h3>
-                  <Button variant="ghost" size="sm" onClick={toggleComparison}>
-                    {showComparison ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                  </Button>
-                </div>
-                <div className="border rounded-md overflow-hidden">
-                  <Tabs defaultValue="side-by-side" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="side-by-side">並べて表示</TabsTrigger>
-                      <TabsTrigger value="unified">統合表示</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="side-by-side" className="p-0">
-                      <div className="grid grid-cols-2 divide-x">
-                        <div className="p-3 bg-red-50">
-                          <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
-                          <div className="whitespace-pre-wrap break-words text-sm">
-                            {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
-                          </div>
-                        </div>
-                        <div className="p-3 bg-green-50">
-                          <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
-                          <div className="whitespace-pre-wrap break-words text-sm">
-                            {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="unified" className="p-0">
-                      <div className="p-3">
-                        <div className="text-xs font-medium mb-2">変更点</div>
-                        {getPreviousText() === text ? (
-                          <div className="text-sm text-muted-foreground">変更はありません</div>
-                        ) : (
-                          <div className="text-sm">
-                            {getPreviousText().split("\n").map((line, i) => (
-                              <div key={`old-${i}`} className="bg-red-50 text-red-800 p-1 mb-1 rounded">
-                                - {line}
+                {showComparison && mode === "correction" && (
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-sm font-medium">変更内容</h3>
+                      <Button variant="ghost" size="sm" onClick={toggleComparison}>
+                        {showComparison ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <div className="border rounded-md overflow-hidden">
+                      <Tabs defaultValue="side-by-side" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="side-by-side">並べて表示</TabsTrigger>
+                          <TabsTrigger value="unified">統合表示</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="side-by-side" className="p-0">
+                          <div className="grid grid-cols-2 divide-x">
+                            <div className="p-3 bg-red-50">
+                              <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
+                              <div className="whitespace-pre-wrap break-words text-sm">
+                                {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
                               </div>
-                            ))}
-                            {text.split("\n").map((line, i) => (
-                              <div key={`new-${i}`} className="bg-green-50 text-green-800 p-1 mb-1 rounded">
-                                + {line}
+                            </div>
+                            <div className="p-3 bg-green-50">
+                              <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
+                              <div className="whitespace-pre-wrap break-words text-sm">
+                                {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
                               </div>
-                            ))}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              </div>
+                        </TabsContent>
+                        <TabsContent value="unified" className="p-0">
+                          <div className="p-3">
+                            <div className="text-xs font-medium mb-2">変更点</div>
+                            {getPreviousText() === text ? (
+                              <div className="text-sm text-muted-foreground">変更はありません</div>
+                            ) : (
+                              <div className="text-sm">
+                                {getPreviousText().split("\n").map((line, i) => (
+                                  <div key={`old-${i}`} className="bg-red-50 text-red-800 p-1 mb-1 rounded">
+                                    - {line}
+                                  </div>
+                                ))}
+                                {text.split("\n").map((line, i) => (
+                                  <div key={`new-${i}`} className="bg-green-50 text-green-800 p-1 mb-1 rounded">
+                                    + {line}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="text-sm text-muted-foreground">
-              {mode === "edit"
+              {mode === "upload"
+                ? "商品画像をアップロードすると、AIが商品説明文を生成します。"
+                : mode === "edit"
                 ? "編集モード: テキストを直接入力してください。"
                 : "修正モード: 音声でフィードバックを提供すると、AIが文章を修正します。"}
             </div>
