@@ -1,10 +1,10 @@
 export class RealtimeAudioRecorder {
   private ws: WebSocket | null = null
-  private mediaStream: MediaStream | null = null
-  private audioContext: AudioContext | null = null
-  private mediaRecorder: MediaRecorder | null = null
   private onMessageCallback: ((data: any) => void) | null = null
   private onErrorCallback: ((error: any) => void) | null = null
+  private reconnectAttempts = 0
+  private readonly maxReconnectAttempts = 3
+  private userId: string | null = null  // ユーザーIDを保持
 
   constructor() {}
 
@@ -22,15 +22,19 @@ export class RealtimeAudioRecorder {
 
   private async setupWebSocket(userId: string): Promise<void> {
     try {
-      // WebSocketのURLにユーザーIDをクエリパラメータとして追加
+      this.userId = userId  // ユーザーIDを保存
       const wsUrl = new URL('ws://localhost:8000/ws')
       wsUrl.searchParams.append('user_id', userId)
+      
+      console.log(`[${new Date().toISOString()}] Setting up WebSocket for user ${userId}...`)
       this.ws = new WebSocket(wsUrl.toString())
 
       this.ws.onmessage = (event) => {
         if (this.onMessageCallback) {
           try {
             const data = JSON.parse(event.data)
+            const receivedTime = new Date().toISOString()
+            // console.log(`[${receivedTime}] WebSocket received message:`, data.type, data)
             this.onMessageCallback(data)
           } catch (error) {
             console.error('Failed to parse WebSocket message:', error)
@@ -39,75 +43,78 @@ export class RealtimeAudioRecorder {
       }
 
       this.ws.onerror = (error) => {
+        const errorTime = new Date().toISOString()
+        console.error(`[${errorTime}] WebSocket error for user ${this.userId}:`, error)
         if (this.onErrorCallback) {
           this.onErrorCallback(error)
+        }
+      }
+
+      this.ws.onclose = async (event) => {
+        const closeTime = new Date().toISOString()
+        console.log(`[${closeTime}] WebSocket connection closed for user ${this.userId}. Code: ${event.code}, Reason: ${event.reason}, Clean: ${event.wasClean}`)
+        
+        if (this.reconnectAttempts < this.maxReconnectAttempts && this.userId) {
+          this.reconnectAttempts++
+          console.log(`[${closeTime}] Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+          try {
+            await this.setupWebSocket(this.userId)
+          } catch (error) {
+            console.error(`[${closeTime}] Reconnection failed:`, error)
+          }
+        } else {
+          console.log(`[${closeTime}] Max reconnection attempts reached or no user ID available`)
+          this.ws = null
+          this.reconnectAttempts = 0
         }
       }
 
       // WebSocket接続が確立されるまで待機
       await new Promise<void>((resolve, reject) => {
         if (!this.ws) return reject(new Error('WebSocket not initialized'))
-        this.ws.onopen = () => resolve()
-        this.ws.onerror = () => reject(new Error('WebSocket connection failed'))
+        
+        const timeout = setTimeout(() => {
+          reject(new Error('WebSocket connection timeout'))
+        }, 5000) // 5秒でタイムアウト
+
+        this.ws.onopen = () => {
+          const openTime = new Date().toISOString()
+          console.log(`[${openTime}] WebSocket connection established for user ${this.userId}`)
+          clearTimeout(timeout)
+          this.reconnectAttempts = 0 // 接続成功時にリセット
+          resolve()
+        }
+        
+        this.ws.onerror = () => {
+          clearTimeout(timeout)
+          reject(new Error('WebSocket connection failed'))
+        }
       })
     } catch (error) {
-      console.error('Error setting up WebSocket:', error)
+      console.error(`[${new Date().toISOString()}] Error setting up WebSocket:`, error)
       throw error
     }
   }
 
   public async start(userId: string): Promise<void> {
     try {
-      // WebSocket接続を設定
+      console.log(`[${new Date().toISOString()}] Starting WebSocket connection for user ${userId}...`)
       await this.setupWebSocket(userId)
-
-      // マイクの使用許可を要求
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      this.audioContext = new AudioContext()
-
-      // MediaRecorderの設定
-      this.mediaRecorder = new MediaRecorder(this.mediaStream)
-
-      this.mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.send(event.data)
-        }
-      }
-
-      // 録音開始
-      this.mediaRecorder.start(250) // 250msごとにデータを送信
     } catch (error) {
-      console.error('Error starting recording:', error)
+      console.error(`[${new Date().toISOString()}] Error starting WebSocket connection:`, error)
       this.stop()
       throw error
     }
   }
 
   public stop(): void {
-    // MediaRecorderの停止
-    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop()
-    }
-
-    // AudioContextの停止
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close()
-    }
-
-    // MediaStreamのトラックを停止
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach(track => track.stop())
-    }
-
-    // WebSocket接続を閉じる
+    const stopTime = new Date().toISOString()
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close()
+      console.log(`[${stopTime}] Manually closing WebSocket connection for user ${this.userId}`)
+      this.ws.close(1000, "Manual close")  // 1000はnormal closureを示すコード
     }
-
-    // リソースをクリア
-    this.mediaRecorder = null
-    this.audioContext = null
-    this.mediaStream = null
     this.ws = null
+    this.userId = null
+    this.reconnectAttempts = 0
   }
 }

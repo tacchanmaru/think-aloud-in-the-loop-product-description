@@ -52,43 +52,41 @@ export default function Home() {
     audioRecorderRef.current = new RealtimeAudioRecorder()
 
     audioRecorderRef.current.onMessage((data) => {
-      console.log("Received data from backend:", data)
+      const receivedTime = new Date().toISOString()
+      console.log(`[${receivedTime}] Received message from backend:`, data.type, data)
+
+      // バッチ処理でステート更新を行う
       if (data.type === 'edit_plan') {
-        // 修正プランを先に表示
-        setSuggestion(data.edit_plan)
-        setTranscript(data.utterance)
-        // 元のテキストがなければ設定（初回など）
-        if (!originalText && data.original_text) {
-          setOriginalText(data.original_text)
-        }
-        // history_summaryをコンソールに表示
-        if (data.history_summary) {
-          console.log("Current constraints:", data.history_summary)
-        }
+        Promise.resolve().then(() => {
+          setSuggestion(data.edit_plan)
+          setTranscript(data.utterance)
+          if (!originalText && data.original_text) {
+            setOriginalText(data.original_text)
+          }
+          if (data.history_summary) {
+            console.log(`[${receivedTime}] Current constraints:`, data.history_summary)
+          }
+        })
       } else if (data.type === 'modification_complete') {
-        // 修正完了時の処理
-        setText(data.modified_text)
-        setTranscript(data.utterance)
-        // 元のテキストがなければ設定（初回など）
-        if (!originalText && data.original_text) {
-          setOriginalText(data.original_text)
-        }
-        // 履歴を保存
-        setHistory(data.history)
-        // history_summaryをコンソールに表示
-        if (data.history_summary) {
-          console.log("Updated constraints:", data.history_summary)
-        }
-        // 比較セクションを表示
-        setShowComparison(true)
+        Promise.resolve().then(() => {
+          setText(data.modified_text)
+          setTranscript(data.utterance)
+          if (!originalText && data.original_text) {
+            setOriginalText(data.original_text)
+          }
+          setHistory(data.history)
+          if (data.history_summary) {
+            console.log(`[${receivedTime}] Updated constraints:`, data.history_summary)
+          }
+          setShowComparison(true)
+        })
       } else {
-        // 必要に応じて他のメッセージタイプも処理
-        console.log("Received unexpected message type:", data.type)
+        console.log(`[${receivedTime}] Received unexpected message type:`, data.type)
       }
     })
 
-    audioRecorderRef.current.onError((event) => {
-      console.error("WebSocket error:", event)
+    audioRecorderRef.current.onError((error) => {
+      console.error("WebSocket error:", error)
       setRecordingError(`WebSocket接続エラーが発生しました。バックエンドサーバーが起動しているか確認してください。`)
       stopRecording()
       toast({
@@ -103,10 +101,7 @@ export default function Home() {
         audioRecorderRef.current.stop()
       }
     }
-  }, [originalText]) // originalTextを依存配列に追加
-
-  // 文字起こし結果を処理する関数 (バックエンド処理に変更したため不要)
-  // const handleTranscriptReceived = async (newTranscript: string, isFinal: boolean) => { ... }
+  }, []) // 依存配列を空にする
 
   const toggleMode = async () => {
     try {
