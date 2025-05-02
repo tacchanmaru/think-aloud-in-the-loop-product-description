@@ -113,6 +113,41 @@ export default function Home() {
         throw new Error("テキストが入力されていません")
       }
 
+      // 現在のモードを確認して切り替え
+      const newMode = mode === "edit" ? "correction" : "edit"
+      setMode(newMode)
+
+      // 修正モードに切り替える場合は録音を開始
+      if (newMode === "correction") {
+        try {
+          setRecordingError(null)
+          setApiError(null)
+
+          if (audioRecorderRef.current) {
+            await audioRecorderRef.current.start(userId)
+            setIsRecording(true)
+            console.log("WebSocket connection initiated")
+          }
+        } catch (error) {
+          console.error("Failed to start WebSocket connection:", error)
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          setRecordingError(errorMessage)
+          toast({
+            title: "録音エラー",
+            description: errorMessage,
+            variant: "destructive",
+          })
+          setIsRecording(false)
+          setMode("edit") // エラーが発生した場合は編集モードに戻す
+        }
+      } else {
+        // 編集モードに切り替える場合は録音を停止
+        if (audioRecorderRef.current?.isActive()) {
+          await audioRecorderRef.current.stop()
+          setIsRecording(false)
+        }
+      }
+
       const response = await fetch("http://localhost:8000/api/display-text", {
         method: "POST",
         headers: {
@@ -132,56 +167,6 @@ export default function Home() {
       const data = await response.json()
       setOriginalText(data.text)
       
-      // 現在のモードを確認して切り替え
-      const newMode = mode === "edit" ? "correction" : "edit"
-      setMode(newMode)
-
-      // 修正モードに切り替える場合は WebSocket を初期化
-      if (newMode === "correction") {
-        // 既存の WebSocket 接続を閉じる
-        if (audioRecorderRef.current?.isActive()) {
-          await audioRecorderRef.current.stop()
-        }
-        // 新しい WebSocket 接続を初期化
-        audioRecorderRef.current = new RealtimeAudioRecorder()
-        audioRecorderRef.current.onMessage((data) => {
-          console.log("Received data from backend:", data)
-          if (data.type === 'edit_plan' || data.type === 'no_edit_needed') {
-            setSuggestion(data.edit_plan)
-            setTranscript(data.utterance)
-            if (!originalText && data.original_text) {
-              setOriginalText(data.original_text)
-            }
-            if (data.history_summary) {
-              console.log("Current constraints:", data.history_summary)
-            }
-          } else if (data.type === 'modification_complete') {
-            setText(data.modified_text)
-            setTranscript(data.utterance)
-            if (!originalText && data.original_text) {
-              setOriginalText(data.original_text)
-            }
-            setHistory(data.history)
-            if (data.history_summary) {
-              console.log("Updated constraints:", data.history_summary)
-            }
-            setShowComparison(true)
-          } else {
-            console.log("Received unexpected message type:", data.type)
-          }
-        })
-
-        audioRecorderRef.current.onError((event) => {
-          console.error("WebSocket error:", event)
-          setRecordingError(`WebSocket接続エラーが発生しました。バックエンドサーバーが起動しているか確認してください。`)
-          stopRecording()
-          toast({
-            title: "WebSocketエラー",
-            description: "バックエンドとの接続に失敗しました。",
-            variant: "destructive",
-          })
-        })
-      }
     } catch (error) {
       console.error("Error toggling mode:", error)
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -436,17 +421,6 @@ export default function Home() {
 
                 {mode === "correction" && (
                   <div className="flex flex-col space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className={isRecording ? "bg-red-100" : ""}>
-                        {isRecording ? "音声認識中..." : "録音停止中"}
-                        {isCheckingFeedback && " (フィードバック判定中...)"}
-                      </Badge>
-                      <Button variant="outline" size="sm" onClick={isRecording ? stopRecording : startRecording}>
-                        {isRecording ? <MicOff className="h-4 w-4 mr-2" /> : <Mic className="h-4 w-4 mr-2" />}
-                        {isRecording ? "録音停止" : "録音開始"}
-                      </Button>
-                    </div>
-
                     {recordingError && (
                       <Alert variant="destructive" className="py-2">
                         <AlertCircle className="h-4 w-4" />
