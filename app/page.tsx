@@ -56,7 +56,7 @@ export default function Home() {
       console.log(`[${receivedTime}] Received message from backend:`, data.type, data)
 
       // バッチ処理でステート更新を行う
-      if (data.type === 'edit_plan') {
+      if (data.type === 'edit_plan' || data.type === 'no_edit_needed') {
         Promise.resolve().then(() => {
           setSuggestion(data.edit_plan)
           setTranscript(data.utterance)
@@ -146,7 +146,7 @@ export default function Home() {
         audioRecorderRef.current = new RealtimeAudioRecorder()
         audioRecorderRef.current.onMessage((data) => {
           console.log("Received data from backend:", data)
-          if (data.type === 'edit_plan') {
+          if (data.type === 'edit_plan' || data.type === 'no_edit_needed') {
             setSuggestion(data.edit_plan)
             setTranscript(data.utterance)
             if (!originalText && data.original_text) {
@@ -364,7 +364,13 @@ export default function Home() {
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>メルカリ商品説明ジェネレーター</CardTitle>
+            <div className="text-sm font-semibold text-gray-800">
+              {mode === "upload"
+                ? "商品画像をアップロードすると、AIが商品説明文を生成します。"
+                : mode === "edit"
+                ? "テキストを直接入力してください。"
+                : "思考発話を元にAIが文章を修正提案をします。"}
+            </div>
             {mode !== "upload" && (
               <Button variant={mode === "edit" ? "outline" : "default"} onClick={toggleMode}>
                 {mode === "edit" ? "修正モードに切り替え" : "編集モードに切り替え"}
@@ -403,7 +409,7 @@ export default function Home() {
                         <img
                           src={imagePreview}
                           alt="プレビュー"
-                          className="max-w-[300px] mx-auto rounded-lg"
+                          className="max-w-[200px] max-h-[150px] mx-auto rounded-lg object-contain"
                         />
                       </div>
                     )}
@@ -423,7 +429,7 @@ export default function Home() {
                     <img
                       src={imagePreview}
                       alt="商品画像"
-                      className="max-w-[300px] mx-auto rounded-lg"
+                      className="max-w-[200px] max-h-[150px] mx-auto rounded-lg object-contain"
                     />
                   </div>
                 )}
@@ -448,12 +454,10 @@ export default function Home() {
                       </Alert>
                     )}
 
-                    {transcript && (
-                      <div className="bg-muted p-3 rounded-md text-sm">
-                        <p className="font-semibold mb-1">あなたの発話:</p>
-                        <p className="whitespace-pre-wrap break-words">{transcript}</p>
-                      </div>
-                    )}
+                    <p className="text-sm font-medium mb-2">あなたの発話：</p>
+                    <div className="bg-muted p-3 rounded-md text-sm">
+                      <p className="whitespace-pre-wrap break-words">{transcript || ""}</p>
+                    </div>
 
                     {apiError && (
                       <Alert variant="destructive" className="py-2">
@@ -468,27 +472,24 @@ export default function Home() {
                         <span>処理中...</span>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {suggestion && mode === "correction" && (
-                  <div className="mb-4">
-                    <div className="text-sm font-medium mb-2">修正提案:</div>
+                    <p className="text-sm font-medium mb-2">修正提案：</p>
                     <Textarea
                       ref={suggestionTextareaRef}
-                      value={suggestion}
+                      value={suggestion || ""}
                       readOnly
-                      className="bg-blue-50 text-blue-800 border-blue-200 min-h-[120px]"
+                      className="bg-blue-50 text-blue-800 border-blue-200 min-h-[3em]"
                     />
                   </div>
                 )}
 
                 <div className="relative">
+                  <p className="text-sm font-medium mb-2">商品説明文：</p>
                   {mode === "edit" ? (
                     <Textarea
                       ref={textareaRef}
                       placeholder="ここに商品説明を入力してください..."
-                      className="min-h-[200px] overflow-hidden"
+                      className="min-h-[7.5em] overflow-hidden"
                       value={text}
                       onChange={(e) => {
                         setText(e.target.value)
@@ -496,7 +497,7 @@ export default function Home() {
                       }}
                     />
                   ) : (
-                    <div className="border rounded-md p-3 min-h-[200px] bg-white whitespace-pre-wrap break-words">
+                    <div className="border rounded-md p-3 min-h-[7.5em] bg-white whitespace-pre-wrap break-words">
                       {text || <span className="text-muted-foreground">ここに商品説明が表示されます...</span>}
                     </div>
                   )}
@@ -505,68 +506,28 @@ export default function Home() {
                 {showComparison && mode === "correction" && (
                   <div className="mt-4">
                     <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-sm font-medium">変更内容</h3>
-                      <Button variant="ghost" size="sm" onClick={toggleComparison}>
-                        {showComparison ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                      </Button>
+                      <p className="text-sm font-medium mb-2">変更履歴：</p>
                     </div>
                     <div className="border rounded-md overflow-hidden">
-                      <Tabs defaultValue="side-by-side" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="side-by-side">並べて表示</TabsTrigger>
-                          <TabsTrigger value="unified">統合表示</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="side-by-side" className="p-0">
-                          <div className="grid grid-cols-2 divide-x">
-                            <div className="p-3 bg-red-50">
-                              <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
-                              <div className="whitespace-pre-wrap break-words text-sm">
-                                {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
-                              </div>
-                            </div>
-                            <div className="p-3 bg-green-50">
-                              <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
-                              <div className="whitespace-pre-wrap break-words text-sm">
-                                {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
-                              </div>
-                            </div>
+                      <div className="grid grid-cols-2 divide-x">
+                        <div className="p-3 bg-red-50">
+                          <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
+                          <div className="whitespace-pre-wrap break-words text-sm">
+                            {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
                           </div>
-                        </TabsContent>
-                        <TabsContent value="unified" className="p-0">
-                          <div className="p-3">
-                            <div className="text-xs font-medium mb-2">変更点</div>
-                            {getPreviousText() === text ? (
-                              <div className="text-sm text-muted-foreground">変更はありません</div>
-                            ) : (
-                              <div className="text-sm">
-                                {getPreviousText().split("\n").map((line, i) => (
-                                  <div key={`old-${i}`} className="bg-red-50 text-red-800 p-1 mb-1 rounded">
-                                    - {line}
-                                  </div>
-                                ))}
-                                {text.split("\n").map((line, i) => (
-                                  <div key={`new-${i}`} className="bg-green-50 text-green-800 p-1 mb-1 rounded">
-                                    + {line}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                        </div>
+                        <div className="p-3 bg-green-50">
+                          <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
+                          <div className="whitespace-pre-wrap break-words text-sm">
+                            {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
                           </div>
-                        </TabsContent>
-                      </Tabs>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
               </>
             )}
-
-            <div className="text-sm text-muted-foreground">
-              {mode === "upload"
-                ? "商品画像をアップロードすると、AIが商品説明文を生成します。"
-                : mode === "edit"
-                ? "編集モード: テキストを直接入力してください。"
-                : "修正モード: 音声でフィードバックを提供すると、AIが文章を修正します。"}
-            </div>
           </div>
         </CardContent>
       </Card>
