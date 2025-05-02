@@ -477,27 +477,47 @@ export default function Home() {
                   )}
                 </div>
 
-                {showComparison && mode === "correction" && (
+                {mode === "correction" && (
                   <div className="mt-4">
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-medium mb-2">変更履歴：</p>
+                      <p className="text-sm font-medium">変更履歴</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowComparison(!showComparison)}
+                        className="h-8 px-2"
+                      >
+                        {showComparison ? (
+                          <>
+                            <ArrowUp className="h-4 w-4 mr-1" />
+                            非表示
+                          </>
+                        ) : (
+                          <>
+                            <ArrowDown className="h-4 w-4 mr-1" />
+                            表示
+                          </>
+                        )}
+                      </Button>
                     </div>
-                    <div className="border rounded-md overflow-hidden">
-                      <div className="grid grid-cols-2 divide-x">
-                        <div className="p-3 bg-red-50">
-                          <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
-                          <div className="whitespace-pre-wrap break-words text-sm">
-                            {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
+                    {showComparison && (
+                      <div className="border rounded-md overflow-hidden">
+                        <div className="grid grid-cols-2 divide-x">
+                          <div className="p-3 bg-red-50">
+                            <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
+                            <div className="whitespace-pre-wrap break-words text-sm">
+                              {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
+                            </div>
                           </div>
-                        </div>
-                        <div className="p-3 bg-green-50">
-                          <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
-                          <div className="whitespace-pre-wrap break-words text-sm">
-                            {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
+                          <div className="p-3 bg-green-50">
+                            <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
+                            <div className="whitespace-pre-wrap break-words text-sm">
+                              {text || <span className="text-muted-foreground">現在のテキストはありません</span>}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </>
