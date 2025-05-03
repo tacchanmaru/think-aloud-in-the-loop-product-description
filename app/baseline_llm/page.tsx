@@ -32,6 +32,7 @@ export default function BaselineLLM() {
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [hasLLMEdit, setHasLLMEdit] = useState(false)
+  const [taskStartTime, setTaskStartTime] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const promptRef = useRef<HTMLTextAreaElement>(null)
 
@@ -182,8 +183,28 @@ export default function BaselineLLM() {
     }
   }
 
+  const handleStartEdit = () => {
+    const startTime = new Date().toISOString()
+    setTaskStartTime(startTime)
+    localStorage.setItem('taskStartTime', startTime)
+    console.log("start time: " + startTime)
+    setMode("edit")
+    setTimeout(adjustPromptHeight, 0)
+  }
+
   const handleComplete = () => {
-    router.push("/baseline_llm/complete")
+    const endTime = new Date().toISOString()
+    const startTime = taskStartTime || localStorage.getItem('taskStartTime')
+
+    if (startTime) {
+      localStorage.setItem('taskEndTime', endTime)
+      console.log("end time: " + endTime)
+      const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime()
+      const durationSeconds = Math.floor(durationMs / 1000)
+      localStorage.setItem('taskDuration', durationSeconds.toString())
+    }
+
+    router.push("/complete")
   }
 
   if (!userId) {
@@ -251,11 +272,7 @@ export default function BaselineLLM() {
 
                 <div className="flex justify-end">
                   <Button
-                    onClick={() => {
-                      setMode("edit")
-                      // モード切り替え後すぐに高さを調整
-                      setTimeout(adjustPromptHeight, 0)
-                    }}
+                    onClick={handleStartEdit}
                     variant={text ? "default" : "secondary"}
                     className={text 
                       ? "bg-blue-600 hover:bg-blue-700 transition-colors" 
