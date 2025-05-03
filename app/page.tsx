@@ -4,12 +4,10 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Mic, MicOff, Loader2, AlertCircle, ArrowDown, ArrowUp } from "lucide-react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Loader2, AlertCircle, ArrowDown, ArrowUp } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RealtimeAudioRecorder } from "@/lib/realtime-audio-recorder"
 
 export default function Home() {
@@ -26,16 +24,14 @@ export default function Home() {
   const [recordingError, setRecordingError] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<string | null>(null)
-  const [isCheckingFeedback, setIsCheckingFeedback] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const suggestionTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null)
-  const accumulatedTranscriptRef = useRef<string>("")
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([])
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // ユーザー認証チェック
   useEffect(() => {
@@ -480,7 +476,7 @@ export default function Home() {
                 {mode === "correction" && (
                   <div className="mt-4">
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-medium">変更履歴</p>
+                      <p className="text-sm font-medium">変更履歴：</p>
                       <Button
                         variant="ghost"
                         size="sm"
