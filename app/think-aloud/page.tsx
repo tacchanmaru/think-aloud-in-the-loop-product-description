@@ -182,13 +182,53 @@ export default function ThinkAloud() {
     }
   }
 
-  const handleStartEdit = () => {
-    const startTime = new Date().toISOString()
-    setTaskStartTime(startTime)
-    localStorage.setItem('taskStartTime', startTime)
-    console.log("start time: " + startTime)
-    setMode("correction")
-    startRecording()
+  const handleStartEdit = async () => {
+    try {
+      if (!userId) {
+        throw new Error("ユーザーIDが見つかりません")
+      }
+
+      if (!text) {
+        throw new Error("テキストが入力されていません")
+      }
+
+      const startTime = new Date().toISOString()
+      setTaskStartTime(startTime)
+      localStorage.setItem('taskStartTime', startTime)
+      console.log("start time: " + startTime)
+
+      // テキストをバックエンドに送信
+      const response = await fetch("http://localhost:8000/api/display-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: text,
+          user_id: userId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "サーバーエラーが発生しました")
+      }
+
+      const data = await response.json()
+      setOriginalText(data.text)
+
+      // モードを変更し、録音を開始
+      setMode("correction")
+      await startRecording()
+    } catch (error) {
+      console.error("Error starting edit:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      toast({
+        title: "エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    }
   }
 
   const handleComplete = () => {
