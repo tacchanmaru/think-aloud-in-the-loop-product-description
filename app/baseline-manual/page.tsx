@@ -113,14 +113,14 @@ export default function BaselineManual() {
             userId={userId}
             onEditStart={handleEditStartFromUpload}
             initialData={currentProduct} // ★商品データを渡す
-            headerText={currentProduct ? `「${currentProduct.name}」の説明文を編集対象とします` : "商品説明文の編集"}
           />
         ) : (
           // Edit Mode
           <>
             <CardHeader>
               <div className="text-sm font-semibold text-gray-800">
-                {currentProduct ? `「${currentProduct.name}」の` : ""}商品説明文を編集してください。
+                「出品していい」と思う状態まで、商品説明文を編集してください。<br/>
+                編集が完了したら、編集完了ボタンを押してください。
               </div>
             </CardHeader>
             <CardContent>

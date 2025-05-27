@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 interface ProductImageUploadPhaseProps {
   userId: string;
   onEditStart: (text: string, imagePreviewUrl: string | null, startTime: string) => void; // startTime を追加
-  headerText?: string;
   apiEndpointGenerateDescription?: string;
   initialData?: { // 初期データ表示モード用のオプション
     text: string;
@@ -22,7 +21,6 @@ interface ProductImageUploadPhaseProps {
 export default function ProductImageUploadPhase({
   userId,
   onEditStart,
-  headerText = "商品画像をアップロードすると、AIが商品説明文を生成します。",
   apiEndpointGenerateDescription = 'http://localhost:8000/api/generate-description',
   initialData
 }: ProductImageUploadPhaseProps) {
@@ -123,9 +121,15 @@ export default function ProductImageUploadPhase({
   return (
     <>
       <CardHeader>
-        <div className="text-sm font-semibold text-gray-800">
-          {isInitialDataMode ? "提供された情報から編集を開始します。" : headerText}
-        </div>
+      <div className="text-sm font-semibold text-gray-800">
+        {isInitialDataMode ?
+          "画面上の商品説明文をよく読んでから、編集を開始してください。" : (
+          <>
+            商品画像をアップロードすると、AIが商品説明文を生成します。<br />
+            生成された商品説明文をよく読んでから、編集を開始してください。
+          </>
+        )}
+      </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

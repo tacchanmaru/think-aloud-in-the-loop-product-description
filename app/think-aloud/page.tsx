@@ -275,14 +275,14 @@ export default function ThinkAloud() {
             userId={userId}
             onEditStart={handleSetupForCorrectionPhase}
             initialData={currentProduct}
-            headerText={currentProduct ? `「${currentProduct.name}」の説明文をAIが生成します` : "商品説明文のAI生成"}
           />
         ) : (
           // Correction Mode
           <>
             <CardHeader>
               <div className="text-sm font-semibold text-gray-800">
-                {currentProduct ? `「${currentProduct.name}」の` : ""}商品説明文を思考発話で修正します。
+                商品画像をアップロードすると、AIが商品説明文を生成します。<br />
+                生成された商品説明文をよく読んでから、編集を開始してください。
               </div>
             </CardHeader>
             <CardContent>
