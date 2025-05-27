@@ -1,12 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Loader2, AlertCircle } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { AlertCircle } from "lucide-react" // 編集フェーズのエラー表示用に残す
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -18,210 +17,119 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import ProductImageUploadPhase from "@/components/custom/ProductImageUploadPhase"
+import { getProductForExperiment, ExperimentPageType } from "@/lib/experimentUtils" // ★追加
+import type { Product } from "@/lib/products" // ★追加
 
 export default function BaselineManual() {
   const router = useRouter()
-  const { toast } = useToast()
   const [mode, setMode] = useState<"upload" | "edit">("upload")
   const [userId, setUserId] = useState<string | null>(null)
-  const [text, setText] = useState("")
-  const [originalText, setOriginalText] = useState("")
-  const [isUploading, setIsUploading] = useState(false)
-  const [apiError, setApiError] = useState<string | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  
+  // 編集フェーズで使用するstate
+  const [textForEdit, setTextForEdit] = useState("")
+  const [originalTextForEdit, setOriginalTextForEdit] = useState("")
+  const [imagePreviewForEdit, setImagePreviewForEdit] = useState<string | null>(null)
   const [hasEdited, setHasEdited] = useState(false)
-  const [taskStartTime, setTaskStartTime] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [taskStartTime, setTaskStartTime] = useState<string | null>(null) // ProductImageUploadPhaseから受け取る開始時刻
+  const [editPhaseApiError, setEditPhaseApiError] = useState<string | null>(null) // 編集フェーズ専用のエラー
 
-  // ユーザー認証チェック
+  const [currentProduct, setCurrentProduct] = useState<Product | null>(null) // ★表示する商品情報
+  const textareaRef = useRef<HTMLTextAreaElement>(null) // 編集フェーズのテキストエリア用
+
+  // ユーザー認証チェック と 商品割り当て
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId")
     if (!storedUserId) {
       router.push("/login")
     } else {
       setUserId(storedUserId)
+      // ユーザーIDに基づいて表示する商品を取得
+      const product = getProductForExperiment(storedUserId, ExperimentPageType.BaselineManual)
+      setCurrentProduct(product)
     }
   }, [router])
 
-  // テキストエリアの高さを自動調整する関数
+  // テキストエリアの高さを自動調整する関数 (編集フェーズ用)
   const adjustTextareaHeight = () => {
-    if (textareaRef.current) {
+    if (mode === "edit" && textareaRef.current) {
       textareaRef.current.style.height = 'auto'
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
     }
   }
 
-  // テキストが変更されたときに高さを調整
+  // テキストが変更されたときに高さを調整 (編集フェーズ用)
   useEffect(() => {
-    setTimeout(adjustTextareaHeight, 0)
-  }, [text])
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !userId) return
-
-    // プレビュー表示
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string)
+    if (mode === "edit") {
+      setTimeout(adjustTextareaHeight, 0)
     }
-    reader.readAsDataURL(file)
+  }, [textForEdit, mode])
 
-    setIsUploading(true)
-    setApiError(null)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('user_id', userId)
-
-      const response = await fetch('http://localhost:8000/api/generate-description', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        setText(result.description)
-        setOriginalText(result.description)
-      } else {
-        const errorMessage = `説明文の生成に失敗しました: ${result.error}`
-        setApiError(errorMessage)
-        toast({
-          title: "エラー",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      const errorMessage = `エラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
-      setApiError(errorMessage)
-      toast({
-        title: "エラー",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newText = e.target.value
-    setText(newText)
-    setHasEdited(newText !== originalText)
-    adjustTextareaHeight()
-  }
-
-  // 編集モードに移行する際の処理
-  const handleStartEdit = () => {
-    const startTime = new Date().toISOString()
-    setTaskStartTime(startTime)
-    console.log("start time: " + startTime)
-    localStorage.setItem('taskStartTime', startTime)
+  // ProductImageUploadPhase から呼び出されるコールバック関数
+  const handleEditStartFromUpload = (generatedText: string, uploadedImagePreview: string | null, startTime: string) => {
+    setTextForEdit(generatedText)
+    setOriginalTextForEdit(generatedText)
+    setImagePreviewForEdit(uploadedImagePreview)
+    
+    setTaskStartTime(startTime) // ★開始時刻をstateに保存
+    localStorage.setItem('taskStartTime', startTime) // localStorageにも保存
+    console.log("BaselineManual - Edit Start Time:", startTime)
+    
     setMode("edit")
   }
 
-  // タスク完了時の処理
+  const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const newText = e.target.value
+    setTextForEdit(newText)
+    setHasEdited(newText !== originalTextForEdit)
+  }
+
   const handleComplete = () => {
     const endTime = new Date().toISOString()
-    const startTime = taskStartTime || localStorage.getItem('taskStartTime')
+    // taskStartTime は localStorage から読むか、state から読むか統一（ここではlocalStorage優先）
+    const startTimeFromStorage = localStorage.getItem('taskStartTime') 
 
-    if (startTime) {
+    if (startTimeFromStorage) {
       localStorage.setItem('taskEndTime', endTime)
       console.log("end time: " + endTime)
-      const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime()
+      const durationMs = new Date(endTime).getTime() - new Date(startTimeFromStorage).getTime()
       const durationSeconds = Math.floor(durationMs / 1000)
       localStorage.setItem('taskDuration', durationSeconds.toString())
+    } else {
+      console.warn("Task start time not found in localStorage.")
     }
-
     router.push("/complete")
   }
 
-  if (!userId) {
-    return null
+  if (!userId || !currentProduct) {
+    return <div className="container mx-auto py-8 px-4 text-center">ユーザー情報または商品情報を読み込み中です...</div>;
   }
 
   return (
     <main className="container mx-auto py-8 px-4">
       <Card className="max-w-3xl mx-auto">
-        <CardHeader>
-          <div className="text-sm font-semibold text-gray-800">
-            {mode === "upload"
-              ? "商品画像をアップロードすると、AIが商品説明文を生成します。"
-              : "商品説明文を編集してください。"}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {mode === "upload" ? (
-              <>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="imageInput"
-                  />
-                  <div className="space-y-4">
-                    <Button
-                      onClick={() => document.getElementById('imageInput')?.click()}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          画像をアップロード中...
-                        </>
-                      ) : (
-                        '商品画像を選択'
-                      )}
-                    </Button>
-                    {imagePreview && (
-                      <div className="mt-4">
-                        <img
-                          src={imagePreview}
-                          alt="プレビュー"
-                          className="max-w-[200px] max-h-[150px] mx-auto rounded-lg object-contain"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">商品説明文：</p>
-                  <Textarea
-                    ref={textareaRef}
-                    placeholder="ここに商品説明が表示されます..."
-                    className="min-h-[7.5em] overflow-hidden"
-                    value={text}
-                    readOnly
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleStartEdit}
-                    variant={text ? "default" : "secondary"}
-                    className={text 
-                      ? "bg-blue-600 hover:bg-blue-700 transition-colors" 
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"}
-                    disabled={!text}
-                  >
-                    編集に進む
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                {imagePreview && (
+        {mode === "upload" ? (
+          <ProductImageUploadPhase
+            userId={userId}
+            onEditStart={handleEditStartFromUpload}
+            initialData={currentProduct} // ★商品データを渡す
+            headerText={currentProduct ? `「${currentProduct.name}」の説明文を編集対象とします` : "商品説明文の編集"}
+          />
+        ) : (
+          // Edit Mode
+          <>
+            <CardHeader>
+              <div className="text-sm font-semibold text-gray-800">
+                {currentProduct ? `「${currentProduct.name}」の` : ""}商品説明文を編集してください。
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {imagePreviewForEdit && (
                   <div className="text-center mb-4">
                     <img
-                      src={imagePreview}
-                      alt="商品画像"
+                      src={imagePreviewForEdit}
+                      alt={currentProduct?.name || "商品画像"}
                       className="max-w-[200px] max-h-[150px] mx-auto rounded-lg object-contain"
                     />
                   </div>
@@ -232,8 +140,8 @@ export default function BaselineManual() {
                   <Textarea
                     ref={textareaRef}
                     placeholder="ここに商品説明が表示されます..."
-                    className="min-h-[7.5em] resize-y"
-                    value={text}
+                    className="min-h-[7.5em] resize-y whitespace-pre-line" // ★whitespace-pre-line を追加
+                    value={textForEdit}
                     onChange={handleTextChange}
                   />
                 </div>
@@ -243,8 +151,8 @@ export default function BaselineManual() {
                     <AlertDialogTrigger asChild>
                       <Button
                         variant={hasEdited ? "default" : "secondary"}
-                        className={hasEdited 
-                          ? "bg-blue-600 hover:bg-blue-700 transition-colors" 
+                        className={hasEdited
+                          ? "bg-blue-600 hover:bg-blue-700 transition-colors"
                           : "bg-gray-200 text-gray-500 cursor-not-allowed"}
                         disabled={!hasEdited}
                       >
@@ -267,17 +175,17 @@ export default function BaselineManual() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-              </>
-            )}
 
-            {apiError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{apiError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-        </CardContent>
+                {editPhaseApiError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{editPhaseApiError}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </>
+        )}
       </Card>
     </main>
   )
