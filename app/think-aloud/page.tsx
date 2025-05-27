@@ -68,9 +68,18 @@ export default function ThinkAloud() {
     audioRecorderRef.current.onMessage((data) => {
       const receivedTime = new Date().toISOString();
       console.log(`[${receivedTime}] Received message from backend:`, data.type, data);
-      if (data.type === 'edit_plan' || data.type === 'no_edit_needed') {
+      if (data.type === 'edit_plan') {
         setSuggestion(data.edit_plan);
         setTranscript(data.utterance);
+        if (data.history_summary) {
+          console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
+        }
+      } else if (data.type === 'no_edit_needed') {
+        // ▼▼▼【ここを変更】▼▼▼
+        const utterance = data.utterance || ""; // 念のためundefinedチェック
+        setSuggestion(`あなたの発話「${utterance}」に対する修正は行いません。`);
+        setTranscript(utterance); // setTranscriptもここで行うのが自然です
+        // ▲▲▲【変更ここまで】▲▲▲
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
@@ -122,27 +131,35 @@ export default function ThinkAloud() {
     setImagePreviewForCorrection(uploadedImagePreview);
     setTaskStartTime(startTime);
     localStorage.setItem('taskStartTime', startTime);
+
     console.log("ThinkAloud - Correction Start Time:", startTime);
+    console.log("1. handleSetupForCorrectionPhase received generatedText:", generatedText);
+
+    setMode("correction");
+    setIsProcessing(true);
+    setCorrectionPhaseApiError(null);
 
     try {
       if (!userId || !currentProduct) {
         throw new Error("ユーザーIDまたは商品情報が見つかりません。");
       }
-      setIsProcessing(true);
-      setCorrectionPhaseApiError(null);
       const response = await fetch("http://localhost:8000/api/display-text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: generatedText, user_id: userId }),
       });
+
+      console.log("2. /api/display-text response status:", response.status);
+
       setIsProcessing(false);
       if (!response.ok) {
         const errorData = await response.json();
+  
         throw new Error(errorData.detail || "サーバーエラーが発生しました。 (display-text)");
       }
       const data = await response.json();
-      setOriginalTextForCorrection(data.text);
-      setTextForCorrection(data.text);
+      setOriginalTextForCorrection(generatedText);
+      setTextForCorrection(generatedText);
       setHasModification(false);
       setMode("correction");
       await startRecordingInternal();
@@ -302,10 +319,11 @@ export default function ThinkAloud() {
                       <AlertDescription>{recordingError}</AlertDescription>
                     </Alert>
                   )}
-                  <p className="text-sm font-medium mb-1">あなたの発話：</p>
+                  {/* think-aloudの場合は、発話は一旦不要 */}
+                  {/* <p className="text-sm font-medium mb-1">あなたの発話：</p>
                   <div className="bg-muted p-3 rounded-md text-sm min-h-[3em]">
                     <p className="whitespace-pre-wrap break-words">{transcript || "ここに発話内容が表示されます..."}</p>
-                  </div>
+                  </div> */}
                   {correctionPhaseApiError && (
                     <Alert variant="destructive" className="py-2">
                       <AlertCircle className="h-4 w-4" />
