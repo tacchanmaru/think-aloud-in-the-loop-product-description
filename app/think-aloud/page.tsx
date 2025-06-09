@@ -20,14 +20,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import ProductImageUploadPhase from "@/components/custom/ProductImageUploadPhase"
+import ThinkAloudExamplesNotification from "@/components/custom/ThinkAloudExamplesNotification"
 import { getProductForExperiment, ExperimentPageType } from "@/lib/experimentUtils"
 import type { Product } from "@/lib/products"
-import { saveExperimentTaskData } from "@/lib/experimentService"; // ★ インポート
-import type { ThinkAloudExperimentResult } from "@/lib/types";   // ★ インポート
+import { saveExperimentTaskData } from "@/lib/experimentService"
+import type { ThinkAloudExperimentResult } from "@/lib/types"
+import { useTestMode } from "@/hooks/useTestMode"
 
 export default function ThinkAloud() {
   const router = useRouter();
   const { toast } = useToast();
+  const isTestMode = useTestMode();
   const [mode, setMode] = useState<"upload" | "correction">("upload");
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -39,13 +42,15 @@ export default function ThinkAloud() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
+  const [showDiff, setShowDiff] = useState(true);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [correctionPhaseApiError, setCorrectionPhaseApiError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [hasModification, setHasModification] = useState(false);
 
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  
+  const [thinkAloudExamples, setThinkAloudExamples] = useState<string[]>([]);
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null);
   const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([]);
@@ -75,11 +80,9 @@ export default function ThinkAloud() {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
       } else if (data.type === 'no_edit_needed') {
-        // ▼▼▼【ここを変更】▼▼▼
-        const utterance = data.utterance || ""; // 念のためundefinedチェック
+        const utterance = data.utterance || "";
         setSuggestion(`あなたの発話「${utterance}」に対する修正は行いません。`);
-        setTranscript(utterance); // setTranscriptもここで行うのが自然です
-        // ▲▲▲【変更ここまで】▲▲▲
+        setTranscript(utterance);
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
@@ -91,6 +94,9 @@ export default function ThinkAloud() {
           console.log(`[${receivedTime}] Updated constraints:`, data.history_summary);
         }
         setHasModification(true);
+      } else if (data.type === 'think-aloud-examples' && isTestMode) {
+        console.log(`[${receivedTime}] Received think-aloud examples:`, data.think_alouds);
+        setThinkAloudExamples(data.think_alouds || []);
       } else {
         console.log(`[${receivedTime}] Received unexpected message type:`, data.type);
       }
@@ -99,7 +105,7 @@ export default function ThinkAloud() {
       console.error("WebSocket error:", error);
       const errorMessage = `WebSocket接続エラー: ${error instanceof Error ? error.message : String(error)}`;
       setRecordingError(errorMessage);
-      if (isRecording) stopRecordingInternal(); // エラー時は録音停止
+      if (isRecording) stopRecordingInternal();
       toast({
         title: "WebSocketエラー",
         description: "バックエンドとの接続に失敗しました。",
@@ -112,7 +118,7 @@ export default function ThinkAloud() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 初期化は一度だけを想定
+  }, [isTestMode]);
 
   const adjustDynamicTextareaHeights = () => {
     if (suggestionTextareaRef.current) {
@@ -154,10 +160,15 @@ export default function ThinkAloud() {
       setIsProcessing(false);
       if (!response.ok) {
         const errorData = await response.json();
-  
         throw new Error(errorData.detail || "サーバーエラーが発生しました。 (display-text)");
       }
       const data = await response.json();
+      
+      if (isTestMode && data.think_aloud_examples) {
+        console.log("Received initial think-aloud examples:", data.think_aloud_examples);
+        setThinkAloudExamples(data.think_aloud_examples);
+      }
+      
       setOriginalTextForCorrection(generatedText);
       setTextForCorrection(generatedText);
       setHasModification(false);
@@ -176,7 +187,6 @@ export default function ThinkAloud() {
     }
   };
 
-  // stopRecording が2箇所で使われるため、内部関数として定義
   const stopRecordingInternal = async () => {
     try {
       if (audioRecorderRef.current?.isActive()) {
@@ -187,16 +197,14 @@ export default function ThinkAloud() {
       }
     } catch (error) {
       console.error("Error stopping recording:", error);
-      // toastはonErrorで出すのでここでは控えるか、状況に応じて
     } finally {
-        setIsRecording(false); // 状態を確実にfalseにする
+        setIsRecording(false);
     }
   };
 
-
-  const handleComplete = async () => { // ★ async に変更
+  const handleComplete = async () => {
     if (isRecording) {
-      await stopRecordingInternal(); // ★ 修正: 内部関数を呼び出し
+      await stopRecordingInternal();
     }
     const endTime = new Date().toISOString();
     const startTimeFromStorage = localStorage.getItem('taskStartTime');
@@ -207,7 +215,7 @@ export default function ThinkAloud() {
         description: "完了処理に必要な情報が不足しています。タスクデータは保存されません。",
         variant: "destructive",
       });
-      router.push("/complete"); // データ不足でも完了ページへ
+      router.push("/complete");
       return;
     }
 
@@ -229,7 +237,6 @@ export default function ThinkAloud() {
       intermediateSteps: history,
     };
 
-    // ★ 共通サービスを呼び出してデータを保存
     const result = await saveExperimentTaskData(experimentData);
 
     if (result.success) {
@@ -244,10 +251,10 @@ export default function ThinkAloud() {
         variant: "destructive",
       });
     }
-    router.push("/complete"); // 保存の成否に関わらず完了ページへ遷移
+    router.push("/complete");
   };
 
-  const startRecordingInternal = async () => { // ★ startRecordingから名前変更 (内部用)
+  const startRecordingInternal = async () => {
     try {
       setRecordingError(null);
       if (audioRecorderRef.current && userId) {
@@ -270,7 +277,6 @@ export default function ThinkAloud() {
     }
   };
 
-
   const getPreviousText = () => {
     if (history.length > 0) {
       if (history.length === 1 && originalTextForCorrection) return originalTextForCorrection;
@@ -278,6 +284,77 @@ export default function ThinkAloud() {
       return originalTextForCorrection;
     }
     return originalTextForCorrection;
+  };
+
+  const calculateLineDiff = (originalText: string, currentText: string) => {
+    const originalLines = originalText.split('\n');
+    const currentLines = currentText.split('\n');
+    
+    // LCS（最長共通部分列）を使用した差分計算
+    const lcs = calculateLCS(originalLines, currentLines);
+    const result: Array<{ content: string; type: 'unchanged' | 'added' | 'removed' }> = [];
+    
+    let i = 0, j = 0, k = 0;
+    
+    while (i < originalLines.length || j < currentLines.length) {
+      if (k < lcs.length && i < originalLines.length && j < currentLines.length && 
+          originalLines[i] === lcs[k] && currentLines[j] === lcs[k]) {
+        // 共通の行
+        result.push({ content: currentLines[j], type: 'unchanged' });
+        i++;
+        j++;
+        k++;
+      } else if (i < originalLines.length && (k >= lcs.length || originalLines[i] !== lcs[k])) {
+        // 削除された行
+        result.push({ content: originalLines[i], type: 'removed' });
+        i++;
+      } else if (j < currentLines.length && (k >= lcs.length || currentLines[j] !== lcs[k])) {
+        // 追加された行
+        result.push({ content: currentLines[j], type: 'added' });
+        j++;
+      }
+    }
+    
+    return result;
+  };
+
+  const calculateLCS = (arr1: string[], arr2: string[]): string[] => {
+    const m = arr1.length;
+    const n = arr2.length;
+    const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+    
+    // DPテーブルを構築
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (arr1[i - 1] === arr2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else {
+          dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+    }
+    
+    // LCSを復元
+    const lcs: string[] = [];
+    let i = m, j = n;
+    
+    while (i > 0 && j > 0) {
+      if (arr1[i - 1] === arr2[j - 1]) {
+        lcs.unshift(arr1[i - 1]);
+        i--;
+        j--;
+      } else if (dp[i - 1][j] > dp[i][j - 1]) {
+        i--;
+      } else {
+        j--;
+      }
+    }
+    
+    return lcs;
+  };
+
+  const handleCloseThinkAloudExamples = () => {
+    setThinkAloudExamples([]);
   };
 
   if (!userId || !currentProduct) {
@@ -299,6 +376,11 @@ export default function ThinkAloud() {
               <div className="text-sm font-semibold text-gray-800">
                 商品画像をアップロードすると、AIが商品説明文を生成します。<br />
                 生成された商品説明文をよく読んでから、編集を開始してください。
+                {isTestMode && (
+                  <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                    🧪 テストモード: 思考発話の例が表示されます
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -319,11 +401,6 @@ export default function ThinkAloud() {
                       <AlertDescription>{recordingError}</AlertDescription>
                     </Alert>
                   )}
-                  {/* think-aloudの場合は、発話は一旦不要 */}
-                  {/* <p className="text-sm font-medium mb-1">あなたの発話：</p>
-                  <div className="bg-muted p-3 rounded-md text-sm min-h-[3em]">
-                    <p className="whitespace-pre-wrap break-words">{transcript || "ここに発話内容が表示されます..."}</p>
-                  </div> */}
                   {correctionPhaseApiError && (
                     <Alert variant="destructive" className="py-2">
                       <AlertCircle className="h-4 w-4" />
@@ -346,48 +423,80 @@ export default function ThinkAloud() {
                   />
                 </div>
                 <div className="relative">
-                  <p className="text-sm font-medium mb-1">商品説明文：</p>
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-sm font-medium">商品説明文：</p>
+                    <div className="flex bg-gray-300 rounded-full p-1">
+                      <button
+                        onClick={() => setShowDiff(true)}
+                        className={`px-4 py-2 text-xs font-medium rounded-full transition-colors ${
+                          showDiff
+                            ? 'bg-green-500 text-white shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        差分表示
+                      </button>
+                      <button
+                        onClick={() => setShowDiff(false)}
+                        className={`px-4 py-2 text-xs font-medium rounded-full transition-colors ${
+                          !showDiff
+                            ? 'bg-green-500 text-white shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        現在の文章のみ
+                      </button>
+                    </div>
+                  </div>
                   <div
                     ref={descriptionDisplayRef}
-                    className="border rounded-md p-3 min-h-[7.5em] bg-white whitespace-pre-line break-words"
+                    className="border rounded-md p-3 min-h-[7.5em] bg-white"
                   >
-                    {textForCorrection || <span className="text-muted-foreground">ここに商品説明が表示されます...</span>}
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm font-medium">変更履歴：</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowComparison(!showComparison)}
-                      className="h-8 px-2"
-                    >
-                      {showComparison ? (
-                        <> <ArrowUp className="h-4 w-4 mr-1" /> 非表示 </>
+                    {textForCorrection ? (
+                      showDiff ? (
+                        <div>
+                          <div className="mb-2 flex gap-4 text-xs">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 bg-green-100 border rounded"></div>
+                              <span>追加された行</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 bg-red-100 border rounded"></div>
+                              <span>削除された行</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 bg-white border rounded"></div>
+                              <span>変更なし</span>
+                            </div>
+                          </div>
+                          <div className="whitespace-pre-line break-words">
+                            {getPreviousText() ? (
+                              calculateLineDiff(getPreviousText() || '', textForCorrection).map((line, index) => (
+                                <div
+                                  key={index}
+                                  className={`${
+                                    line.type === 'added'
+                                      ? 'bg-green-100'
+                                      : line.type === 'removed'
+                                      ? 'bg-red-100'
+                                      : 'bg-white'
+                                  } ${line.content.trim() === '' ? 'min-h-[1em]' : ''}`}
+                                >
+                                  {line.content || '\u00A0'}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="whitespace-pre-line break-words">{textForCorrection}</div>
+                            )}
+                          </div>
+                        </div>
                       ) : (
-                        <> <ArrowDown className="h-4 w-4 mr-1" /> 表示 </>
-                      )}
-                    </Button>
+                        <div className="whitespace-pre-line break-words">{textForCorrection}</div>
+                      )
+                    ) : (
+                      <span className="text-muted-foreground">ここに商品説明が表示されます...</span>
+                    )}
                   </div>
-                  {showComparison && (
-                    <div className="border rounded-md overflow-hidden">
-                      <div className="grid grid-cols-2 divide-x">
-                        <div className="p-3 bg-red-50">
-                          <div className="text-xs font-medium mb-1 text-red-800">直前のテキスト</div>
-                          <div className="whitespace-pre-wrap break-words text-sm">
-                            {getPreviousText() || <span className="text-muted-foreground">直前のテキストはありません</span>}
-                          </div>
-                        </div>
-                        <div className="p-3 bg-green-50">
-                          <div className="text-xs font-medium mb-1 text-green-800">現在のテキスト</div>
-                          <div className="whitespace-pre-wrap break-words text-sm">
-                            {textForCorrection || <span className="text-muted-foreground">現在のテキストはありません</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div className="flex justify-end">
                   <AlertDialog>
@@ -423,6 +532,14 @@ export default function ThinkAloud() {
           </>
         )}
       </Card>
+      
+      {isTestMode && (
+        <ThinkAloudExamplesNotification
+          key={`examples-${thinkAloudExamples.length}-${JSON.stringify(thinkAloudExamples).substring(0, 20)}`}
+          examples={thinkAloudExamples}
+          onClose={handleCloseThinkAloudExamples}
+        />
+      )}
     </main>
   );
 }
