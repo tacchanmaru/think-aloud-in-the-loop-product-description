@@ -25,12 +25,12 @@ import { getProductForExperiment, ExperimentPageType } from "@/lib/experimentUti
 import type { Product } from "@/lib/products"
 import { saveExperimentTaskData } from "@/lib/experimentService"
 import type { ThinkAloudExperimentResult } from "@/lib/types"
-import { useTestMode } from "@/hooks/useTestMode"
+import { usePracticeMode } from "@/hooks/useTestMode"
 
 export default function ThinkAloud() {
   const router = useRouter();
   const { toast } = useToast();
-  const isTestMode = useTestMode();
+  const isPracticeMode = usePracticeMode();
   const [mode, setMode] = useState<"upload" | "correction">("upload");
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -94,7 +94,7 @@ export default function ThinkAloud() {
           console.log(`[${receivedTime}] Updated constraints:`, data.history_summary);
         }
         setHasModification(true);
-      } else if (data.type === 'think-aloud-examples' && isTestMode) {
+      } else if (data.type === 'think-aloud-examples' && isPracticeMode) {
         console.log(`[${receivedTime}] Received think-aloud examples:`, data.think_alouds);
         setThinkAloudExamples(data.think_alouds || []);
       } else {
@@ -118,7 +118,7 @@ export default function ThinkAloud() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTestMode]);
+  }, [isPracticeMode]);
 
   const adjustDynamicTextareaHeights = () => {
     if (suggestionTextareaRef.current) {
@@ -164,7 +164,7 @@ export default function ThinkAloud() {
       }
       const data = await response.json();
       
-      if (isTestMode && data.think_aloud_examples) {
+      if (isPracticeMode && data.think_aloud_examples) {
         console.log("Received initial think-aloud examples:", data.think_aloud_examples);
         setThinkAloudExamples(data.think_aloud_examples);
       }
@@ -376,9 +376,9 @@ export default function ThinkAloud() {
               <div className="text-sm font-semibold text-gray-800">
                 商品画像をアップロードすると、AIが商品説明文を生成します。<br />
                 生成された商品説明文をよく読んでから、編集を開始してください。
-                {isTestMode && (
+                {isPracticeMode && (
                   <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    🧪 テストモード: 思考発話の例が表示されます
+                    🧪 練習モード: 思考発話の例が表示されます
                   </div>
                 )}
               </div>
@@ -533,7 +533,7 @@ export default function ThinkAloud() {
         )}
       </Card>
       
-      {isTestMode && (
+      {isPracticeMode && (
         <ThinkAloudExamplesNotification
           key={`examples-${thinkAloudExamples.length}-${JSON.stringify(thinkAloudExamples).substring(0, 20)}`}
           examples={thinkAloudExamples}

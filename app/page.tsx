@@ -29,6 +29,12 @@ export default function Home() {
           >
             思考発話実験
           </Button>
+          <Button 
+            className="w-full" 
+            onClick={() => router.push("/think-aloud?practice")}
+          >
+            思考発話実験（練習用）
+          </Button>
         </CardContent>
       </Card>
     </main>
