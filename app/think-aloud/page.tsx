@@ -419,7 +419,7 @@ export default function ThinkAloud() {
                     value={suggestion || ""}
                     readOnly
                     placeholder="ここにAIの修正計画や提案が表示されます..."
-                    className="bg-blue-50 text-blue-800 border-blue-200 min-h-[3em]"
+                    className="bg-blue-50 text-blue-800 border-blue-200 min-h-[3em] text-base resize-none overflow-hidden"
                   />
                 </div>
                 <div className="relative">
@@ -469,7 +469,7 @@ export default function ThinkAloud() {
                               <span>変更なし</span>
                             </div>
                           </div>
-                          <div className="whitespace-pre-line break-words">
+                          <div className="whitespace-pre-line break-words text-base">
                             {getPreviousText() ? (
                               calculateLineDiff(getPreviousText() || '', textForCorrection).map((line, index) => (
                                 <div
@@ -486,12 +486,12 @@ export default function ThinkAloud() {
                                 </div>
                               ))
                             ) : (
-                              <div className="whitespace-pre-line break-words">{textForCorrection}</div>
+                              <div className="whitespace-pre-line break-words text-base">{textForCorrection}</div>
                             )}
                           </div>
                         </div>
                       ) : (
-                        <div className="whitespace-pre-line break-words">{textForCorrection}</div>
+                        <div className="whitespace-pre-line break-words text-base">{textForCorrection}</div>
                       )
                     ) : (
                       <span className="text-muted-foreground">ここに商品説明が表示されます...</span>
