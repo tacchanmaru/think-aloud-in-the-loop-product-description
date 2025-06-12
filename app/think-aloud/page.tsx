@@ -34,6 +34,20 @@ export default function ThinkAloud() {
   const [mode, setMode] = useState<"upload" | "correction">("upload");
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Practice mode data
+  const practiceData = {
+    text: `ユニークなガチョウのぬいぐるみ、大きめサイズで存在感があります。
+
+- 動物モチーフ: ガチョウ
+- カラー: ホワイト×オレンジ
+- 素材: ふわふわの生地
+- サイズ: 大きめ（約全長80cm）
+- 特徴: インテリアや抱き枕にもおすすめ
+
+ご覧いただきありがとうございます。`,
+    imagePreviewUrl: "/images/goose.jpeg"
+  };
+
   const [textForCorrection, setTextForCorrection] = useState("");
   const [originalTextForCorrection, setOriginalTextForCorrection] = useState("");
   const [imagePreviewForCorrection, setImagePreviewForCorrection] = useState<string | null>(null);
@@ -368,7 +382,7 @@ export default function ThinkAloud() {
           <ProductImageUploadPhase
             userId={userId}
             onEditStart={handleSetupForCorrectionPhase}
-            initialData={currentProduct}
+            initialData={isPracticeMode ? practiceData : currentProduct}
           />
         ) : (
           <>
