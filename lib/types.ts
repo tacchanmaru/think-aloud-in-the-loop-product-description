@@ -17,6 +17,7 @@ export interface BaseExperimentData {
   startTime: string; // ISO形式
   endTime: string;   // ISO形式
   durationSeconds: number;
+  isPracticeMode?: boolean;
 }
 
 // Manual実験の結果データ型

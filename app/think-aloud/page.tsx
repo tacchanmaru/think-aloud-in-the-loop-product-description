@@ -20,7 +20,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import ProductImageUploadPhase from "@/components/custom/ProductImageUploadPhase"
-import ThinkAloudExamplesNotification from "@/components/custom/ThinkAloudExamplesNotification"
 import { getProductForExperiment, ExperimentPageType } from "@/lib/experimentUtils"
 import type { Product } from "@/lib/products"
 import { saveExperimentTaskData } from "@/lib/experimentService"
@@ -67,7 +66,6 @@ export default function ThinkAloud() {
 
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   
-  const [thinkAloudExamples, setThinkAloudExamples] = useState<string[]>([]);
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null);
   const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([]);
@@ -116,9 +114,6 @@ export default function ThinkAloud() {
         setHasModification(true);
         setShowEditingReflection(false); // Hide "編集反映中"
         setProcessingUtterance(null); // Clear processing utterance
-      } else if (data.type === 'think-aloud-examples' && isPracticeMode) {
-        console.log(`[${receivedTime}] Received think-aloud examples:`, data.think_alouds);
-        setThinkAloudExamples(data.think_alouds || []);
       } else if (data.type === 'processing_started') {
         console.log(`[${receivedTime}] Processing started for utterance:`, data.utterance);
         setProcessingUtterance(data.utterance);
@@ -202,11 +197,6 @@ export default function ThinkAloud() {
       }
       const data = await response.json();
       
-      if (isPracticeMode && data.think_aloud_examples) {
-        console.log("Received initial think-aloud examples:", data.think_aloud_examples);
-        setThinkAloudExamples(data.think_aloud_examples);
-      }
-      
       setOriginalTextForCorrection(generatedText);
       setTextForCorrection(generatedText);
       setHasModification(false);
@@ -273,6 +263,7 @@ export default function ThinkAloud() {
       endTime,
       durationSeconds,
       intermediateSteps: history,
+      isPracticeMode,
     };
 
     const result = await saveExperimentTaskData(experimentData);
@@ -391,9 +382,6 @@ export default function ThinkAloud() {
     return lcs;
   };
 
-  const handleCloseThinkAloudExamples = () => {
-    setThinkAloudExamples([]);
-  };
 
   if (!userId || !currentProduct) {
     return <div className="container mx-auto py-8 px-4 text-center">ユーザー情報または商品情報を読み込み中です...</div>;
@@ -416,7 +404,7 @@ export default function ThinkAloud() {
                 生成された商品説明文をよく読んでから、編集を開始してください。
                 {isPracticeMode && (
                   <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    🧪 練習モード: 思考発話の例が表示されます
+                    🧪 練習モード
                   </div>
                 )}
               </div>
@@ -612,14 +600,6 @@ export default function ThinkAloud() {
           </>
         )}
       </Card>
-      
-      {isPracticeMode && (
-        <ThinkAloudExamplesNotification
-          key={`examples-${thinkAloudExamples.length}-${JSON.stringify(thinkAloudExamples).substring(0, 20)}`}
-          examples={thinkAloudExamples}
-          onClose={handleCloseThinkAloudExamples}
-        />
-      )}
     </main>
   );
 }
