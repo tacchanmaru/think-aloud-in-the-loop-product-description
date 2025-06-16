@@ -61,6 +61,9 @@ export default function ThinkAloud() {
   const [correctionPhaseApiError, setCorrectionPhaseApiError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [hasModification, setHasModification] = useState(false);
+  const [processingUtterance, setProcessingUtterance] = useState<string | null>(null);
+  const [recognizedUtterances, setRecognizedUtterances] = useState<string[]>([]);
+  const [showEditingReflection, setShowEditingReflection] = useState(false);
 
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   
@@ -90,6 +93,8 @@ export default function ThinkAloud() {
       if (data.type === 'edit_plan') {
         setSuggestion(data.edit_plan);
         setTranscript(data.utterance);
+        setShowEditingReflection(true); // Show editing status
+        // Keep processingUtterance to display below the editing message
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
@@ -97,6 +102,7 @@ export default function ThinkAloud() {
         const utterance = data.utterance || "";
         setSuggestion(`あなたの発話「${utterance}」に対する修正は行いません。`);
         setTranscript(utterance);
+        setProcessingUtterance(null); // Clear processing utterance
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
@@ -108,9 +114,27 @@ export default function ThinkAloud() {
           console.log(`[${receivedTime}] Updated constraints:`, data.history_summary);
         }
         setHasModification(true);
+        setShowEditingReflection(false); // Hide "編集反映中"
+        setProcessingUtterance(null); // Clear processing utterance
       } else if (data.type === 'think-aloud-examples' && isPracticeMode) {
         console.log(`[${receivedTime}] Received think-aloud examples:`, data.think_alouds);
         setThinkAloudExamples(data.think_alouds || []);
+      } else if (data.type === 'processing_started') {
+        console.log(`[${receivedTime}] Processing started for utterance:`, data.utterance);
+        setProcessingUtterance(data.utterance);
+        // Remove utterances that match the processing utterance from the beginning
+        setRecognizedUtterances(prev => {
+          const combinedText = prev.join("");
+          if (combinedText.startsWith(data.utterance)) {
+            const remainingText = combinedText.slice(data.utterance.length);
+            return remainingText ? [remainingText] : [];
+          }
+          return prev;
+        });
+      } else if (data.type === 'transcription_completed') {
+        console.log(`[${receivedTime}] Transcription completed:`, data.utterance);
+        // Add to recognized utterances
+        setRecognizedUtterances(prev => [...prev, data.utterance])
       } else {
         console.log(`[${receivedTime}] Received unexpected message type:`, data.type);
       }
@@ -427,14 +451,14 @@ export default function ThinkAloud() {
                       <span>初期テキストを処理中...</span>
                     </div>
                   )}
-                  <p className="text-sm font-medium mb-1">AIによる修正提案：</p>
+                  {/* <p className="text-sm font-medium mb-1">AIによる修正提案：</p>
                   <Textarea
                     ref={suggestionTextareaRef}
                     value={suggestion || ""}
                     readOnly
                     placeholder="ここにAIの修正計画や提案が表示されます..."
                     className="bg-blue-50 text-blue-800 border-blue-200 min-h-[3em] text-base resize-none overflow-hidden"
-                  />
+                  /> */}
                 </div>
                 <div className="relative">
                   <div className="flex justify-between items-center mb-1">
@@ -512,6 +536,48 @@ export default function ThinkAloud() {
                     )}
                   </div>
                 </div>
+                
+                {/* Status Display Sections */}
+                <div className="space-y-3">
+                  {/* Processing Utterance */}
+                  <div>
+                    <p className="text-sm font-medium mb-1">処理中の発話：</p>
+                    <div className="border rounded-md p-3 min-h-[2.5em] bg-yellow-50 border-yellow-200">
+                      {showEditingReflection ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2 text-blue-600" />
+                            <span className="text-blue-800 text-base font-bold">商品説明文を編集します</span>
+                          </div>
+                          {processingUtterance && (
+                            <div className="text-yellow-800 text-sm pl-6">
+                              {processingUtterance}
+                            </div>
+                          )}
+                        </div>
+                      ) : processingUtterance ? (
+                        <div className="flex items-center">
+                          <span className="text-yellow-800 text-sm">{processingUtterance}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">処理中の発話がここに表示されます...</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Recognized Utterances */}
+                  <div>
+                    <p className="text-sm font-medium mb-1">認識中の発話：</p>
+                    <div className="border rounded-md p-3 min-h-[2.5em] bg-green-50 border-green-200">
+                      {recognizedUtterances.length > 0 ? (
+                        <span className="text-green-800 text-sm">{recognizedUtterances.join("")}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">認識された発話がここに表示されます...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="flex justify-end">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
