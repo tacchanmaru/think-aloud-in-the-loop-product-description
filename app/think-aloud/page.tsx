@@ -20,7 +20,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import ProductImageUploadPhase from "@/components/custom/ProductImageUploadPhase"
-import ThinkAloudExamplesNotification from "@/components/custom/ThinkAloudExamplesNotification"
 import { getProductForExperiment, ExperimentPageType } from "@/lib/experimentUtils"
 import type { Product } from "@/lib/products"
 import { saveExperimentTaskData } from "@/lib/experimentService"
@@ -61,10 +60,12 @@ export default function ThinkAloud() {
   const [correctionPhaseApiError, setCorrectionPhaseApiError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [hasModification, setHasModification] = useState(false);
+  const [processingUtterance, setProcessingUtterance] = useState<string | null>(null);
+  const [recognizedUtterances, setRecognizedUtterances] = useState<string[]>([]);
+  const [showEditingReflection, setShowEditingReflection] = useState(false);
 
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   
-  const [thinkAloudExamples, setThinkAloudExamples] = useState<string[]>([]);
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null);
   const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([]);
@@ -90,6 +91,8 @@ export default function ThinkAloud() {
       if (data.type === 'edit_plan') {
         setSuggestion(data.edit_plan);
         setTranscript(data.utterance);
+        setShowEditingReflection(true); // Show editing status
+        // Keep processingUtterance to display below the editing message
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
@@ -97,6 +100,7 @@ export default function ThinkAloud() {
         const utterance = data.utterance || "";
         setSuggestion(`あなたの発話「${utterance}」に対する修正は行いません。`);
         setTranscript(utterance);
+        setProcessingUtterance(null); // Clear processing utterance
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
@@ -108,9 +112,24 @@ export default function ThinkAloud() {
           console.log(`[${receivedTime}] Updated constraints:`, data.history_summary);
         }
         setHasModification(true);
-      } else if (data.type === 'think-aloud-examples' && isPracticeMode) {
-        console.log(`[${receivedTime}] Received think-aloud examples:`, data.think_alouds);
-        setThinkAloudExamples(data.think_alouds || []);
+        setShowEditingReflection(false); // Hide "編集反映中"
+        setProcessingUtterance(null); // Clear processing utterance
+      } else if (data.type === 'processing_started') {
+        console.log(`[${receivedTime}] Processing started for utterance:`, data.utterance);
+        setProcessingUtterance(data.utterance);
+        // Remove utterances that match the processing utterance from the beginning
+        setRecognizedUtterances(prev => {
+          const combinedText = prev.join("");
+          if (combinedText.startsWith(data.utterance)) {
+            const remainingText = combinedText.slice(data.utterance.length);
+            return remainingText ? [remainingText] : [];
+          }
+          return prev;
+        });
+      } else if (data.type === 'transcription_completed') {
+        console.log(`[${receivedTime}] Transcription completed:`, data.utterance);
+        // Add to recognized utterances
+        setRecognizedUtterances(prev => [...prev, data.utterance])
       } else {
         console.log(`[${receivedTime}] Received unexpected message type:`, data.type);
       }
@@ -178,11 +197,6 @@ export default function ThinkAloud() {
       }
       const data = await response.json();
       
-      if (isPracticeMode && data.think_aloud_examples) {
-        console.log("Received initial think-aloud examples:", data.think_aloud_examples);
-        setThinkAloudExamples(data.think_aloud_examples);
-      }
-      
       setOriginalTextForCorrection(generatedText);
       setTextForCorrection(generatedText);
       setHasModification(false);
@@ -249,6 +263,7 @@ export default function ThinkAloud() {
       endTime,
       durationSeconds,
       intermediateSteps: history,
+      isPracticeMode,
     };
 
     const result = await saveExperimentTaskData(experimentData);
@@ -367,9 +382,6 @@ export default function ThinkAloud() {
     return lcs;
   };
 
-  const handleCloseThinkAloudExamples = () => {
-    setThinkAloudExamples([]);
-  };
 
   if (!userId || !currentProduct) {
     return <div className="container mx-auto py-8 px-4 text-center">ユーザー情報または商品情報を読み込み中です...</div>;
@@ -392,7 +404,7 @@ export default function ThinkAloud() {
                 生成された商品説明文をよく読んでから、編集を開始してください。
                 {isPracticeMode && (
                   <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    🧪 練習モード: 思考発話の例が表示されます
+                    🧪 練習モード
                   </div>
                 )}
               </div>
@@ -427,14 +439,14 @@ export default function ThinkAloud() {
                       <span>初期テキストを処理中...</span>
                     </div>
                   )}
-                  <p className="text-sm font-medium mb-1">AIによる修正提案：</p>
+                  {/* <p className="text-sm font-medium mb-1">AIによる修正提案：</p>
                   <Textarea
                     ref={suggestionTextareaRef}
                     value={suggestion || ""}
                     readOnly
                     placeholder="ここにAIの修正計画や提案が表示されます..."
                     className="bg-blue-50 text-blue-800 border-blue-200 min-h-[3em] text-base resize-none overflow-hidden"
-                  />
+                  /> */}
                 </div>
                 <div className="relative">
                   <div className="flex justify-between items-center mb-1">
@@ -512,6 +524,48 @@ export default function ThinkAloud() {
                     )}
                   </div>
                 </div>
+                
+                {/* Status Display Sections */}
+                <div className="space-y-3">
+                  {/* Processing Utterance */}
+                  <div>
+                    <p className="text-sm font-medium mb-1">処理中の発話：</p>
+                    <div className="border rounded-md p-3 min-h-[2.5em] bg-yellow-50 border-yellow-200">
+                      {showEditingReflection ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2 text-blue-600" />
+                            <span className="text-blue-800 text-base font-bold">商品説明文を編集します</span>
+                          </div>
+                          {processingUtterance && (
+                            <div className="text-yellow-800 text-sm pl-6">
+                              {processingUtterance}
+                            </div>
+                          )}
+                        </div>
+                      ) : processingUtterance ? (
+                        <div className="flex items-center">
+                          <span className="text-yellow-800 text-sm">{processingUtterance}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">処理中の発話がここに表示されます...</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Recognized Utterances */}
+                  <div>
+                    <p className="text-sm font-medium mb-1">認識中の発話：</p>
+                    <div className="border rounded-md p-3 min-h-[2.5em] bg-green-50 border-green-200">
+                      {recognizedUtterances.length > 0 ? (
+                        <span className="text-green-800 text-sm">{recognizedUtterances.join("")}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">認識された発話がここに表示されます...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="flex justify-end">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -546,14 +600,6 @@ export default function ThinkAloud() {
           </>
         )}
       </Card>
-      
-      {isPracticeMode && (
-        <ThinkAloudExamplesNotification
-          key={`examples-${thinkAloudExamples.length}-${JSON.stringify(thinkAloudExamples).substring(0, 20)}`}
-          examples={thinkAloudExamples}
-          onClose={handleCloseThinkAloudExamples}
-        />
-      )}
     </main>
   );
 }

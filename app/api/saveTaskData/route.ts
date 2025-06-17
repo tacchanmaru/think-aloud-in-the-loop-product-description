@@ -35,11 +35,13 @@ export async function POST(request: Request) {
       // lastUpdatedAt は不要なので削除
     };
 
-    // パス: experiments/exp-1/task/{userId}
+    // 練習モードかどうかでパスを変更
+    const collectionName = data.isPracticeMode === true ? "practice" : "task";
+    // パス: experiments/exp-1/task/{userId} または experiments/exp-1/practice/{userId}
     const docRef = firestoreDb
       .collection("experiments")    // トップレベルコレクション
       .doc("exp-1")                 // 実験セッションのドキュメント
-      .collection("task")           // "task" サブコレクション
+      .collection(collectionName)   // "task" または "practice" サブコレクション
       .doc(userId);                 // ドキュメントIDに userId を使用
 
     await docRef.set(updateData, { merge: true }); // merge: true で既存フィールドを保持しつつ更新
