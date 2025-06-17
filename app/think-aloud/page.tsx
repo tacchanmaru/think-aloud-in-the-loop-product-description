@@ -88,15 +88,7 @@ export default function ThinkAloud() {
     audioRecorderRef.current.onMessage((data) => {
       const receivedTime = new Date().toISOString();
       console.log(`[${receivedTime}] Received message from backend:`, data.type, data);
-      if (data.type === 'edit_plan') {
-        setSuggestion(data.edit_plan);
-        setTranscript(data.utterance);
-        setShowEditingReflection(true); // Show editing status
-        // Keep processingUtterance to display below the editing message
-        if (data.history_summary) {
-          console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
-        }
-      } else if (data.type === 'no_edit_needed') {
+      if (data.type === 'no_edit_needed') {
         const utterance = data.utterance || "";
         setSuggestion(`あなたの発話「${utterance}」に対する修正は行いません。`);
         setTranscript(utterance);
@@ -104,7 +96,7 @@ export default function ThinkAloud() {
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
-      } else if (data.type === 'modification_complete') {
+      } else if (data.type === 'text_modified') {
         setTextForCorrection(data.modified_text);
         setTranscript(data.utterance);
         setHistory(data.history);
