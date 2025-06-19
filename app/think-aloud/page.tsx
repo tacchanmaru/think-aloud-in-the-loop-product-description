@@ -381,8 +381,8 @@ export default function ThinkAloud() {
           <>
             <CardHeader>
               <div className="text-sm font-semibold text-gray-800">
-                商品画像をアップロードすると、AIが商品説明文を生成します。<br />
-                生成された商品説明文をよく読んでから、編集を開始してください。
+                「出品していい」と思う状態まで、商品説明文を編集してください。<br/>
+                編集が完了したら、編集完了ボタンを押してください。
                 {isPracticeMode && (
                   <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
                     🧪 練習モード
