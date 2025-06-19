@@ -16,13 +16,15 @@ interface ProductImageUploadPhaseProps {
     text: string;
     imagePreviewUrl: string | null;
   };
+  isPracticeMode?: boolean;
 }
 
 export default function ProductImageUploadPhase({
   userId,
   onEditStart,
   apiEndpointGenerateDescription = 'http://localhost:8000/api/generate-description',
-  initialData
+  initialData,
+  isPracticeMode = false
 }: ProductImageUploadPhaseProps) {
   const { toast } = useToast();
   const isInitialDataMode = !!initialData; // initialData が提供されていればtrue
@@ -128,6 +130,11 @@ export default function ProductImageUploadPhase({
             商品画像をアップロードすると、AIが商品説明文を生成します。<br />
             生成された商品説明文をよく読んでから、編集を開始してください。
           </>
+        )}
+        {isPracticeMode && (
+          <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+            🧪 練習モード
+          </div>
         )}
       </div>
       </CardHeader>

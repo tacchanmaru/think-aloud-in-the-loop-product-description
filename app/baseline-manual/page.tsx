@@ -20,13 +20,16 @@ import {
 import ProductImageUploadPhase from "@/components/custom/ProductImageUploadPhase"
 import { getProductForExperiment, ExperimentPageType } from "@/lib/experimentUtils"
 import type { Product } from "@/lib/products"
+import { practiceData } from "@/lib/products"
 import { saveExperimentTaskData } from "@/lib/experimentService"; // ★ インポート
 import type { ManualExperimentResult } from "@/lib/types";      // ★ インポート
 import { useToast } from "@/components/ui/use-toast";          // ★ トーストを使うならインポート
+import { usePracticeMode } from "@/hooks/useTestMode"
 
 export default function BaselineManual() {
   const router = useRouter();
   const { toast } = useToast(); // ★ トーストを使うなら宣言
+  const isPracticeMode = usePracticeMode();
   const [mode, setMode] = useState<"upload" | "edit">("upload");
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -109,6 +112,7 @@ export default function BaselineManual() {
       startTime: startTimeFromStorage,
       endTime,
       durationSeconds,
+      isPracticeMode,
     };
 
     // ★ 共通サービスを呼び出してデータを保存
@@ -140,7 +144,8 @@ export default function BaselineManual() {
           <ProductImageUploadPhase
             userId={userId}
             onEditStart={handleEditStartFromUpload}
-            initialData={currentProduct}
+            initialData={isPracticeMode ? practiceData : currentProduct}
+            isPracticeMode={isPracticeMode}
           />
         ) : (
           <>
@@ -148,6 +153,11 @@ export default function BaselineManual() {
               <div className="text-sm font-semibold text-gray-800">
                 「出品していい」と思う状態まで、商品説明文を編集してください。<br/>
                 編集が完了したら、編集完了ボタンを押してください。
+                {isPracticeMode && (
+                  <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                    🧪 練習モード
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>

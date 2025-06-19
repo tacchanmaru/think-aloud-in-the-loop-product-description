@@ -6,30 +6,76 @@ export interface Product {
   imagePreviewUrl: string | null; // publicディレクトリからのパス
 }
 
+// export const product1: Product = {
+//   id: 'product1',
+//   name: 'フェレット', // 例
+//   text: `かわいい白いフェレットのぬいぐるみ。ふわふわの手触りで、デスクやお部屋のインテリアにもおすすめです。
+
+// - 種類: フェレット
+// - カラー: ホワイト
+// - サイズ: 約20cm
+// - 特徴: 立ち姿、ひげ付き、柔らかい手触り
+
+// ご覧いただきありがとうございます。`,
+//   imagePreviewUrl: '/images/ferret.jpeg',
+// };
+
+// export const product2: Product = {
+//   id: 'product2',
+//   name: 'ペンギン', // 例
+//   text: `ふわふわのペンギンのぬいぐるみ。やわらかい手触りで、お子様やギフトにもぴったりです。
+
+// - アイテム: ペンギンのぬいぐるみ
+// - カラー: グレー×ホワイト
+// - サイズ: 約20cm
+// - 特徴: ふわふわ素材、丸いフォルム
+
+// ご覧いただきありがとうございます。`,
+//   imagePreviewUrl: '/images/penguin.jpeg',
+// };
+
+
 export const product1: Product = {
   id: 'product1',
-  name: 'フェレット', // 例
-  text: `ふわふわの白いイタチのぬいぐるみ。黒いしっぽとつぶらな瞳がかわいらしいデザインです。
+  name: 'ポムポムプリン', // 例
+  text: `ポムポムプリンのぬいぐるみ、黄色のギンガムチェック柄バンダナと青いオーバーオールが可愛いデザインです。
 
-- 種類: イタチのぬいぐるみ
-- カラー: ホワイト（しっぽは黒）
-- 特徴: ふわふわ素材、可愛い表情
-- サイズ: 約20cm（目安）
+- キャラクター名: ポムポムプリン
+- スタイル: ぬいぐるみ
+- デザイン: ギンガムチェック柄バンダナ、青いオーバーオール付き
+- サイズ: 約30cm（目安）
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/ferret.jpeg', // public/images/headphone.jpg を想定
+  imagePreviewUrl: '/images/pom-pom-purin.jpeg',
 };
 
 export const product2: Product = {
   id: 'product2',
-  name: 'ポムポムプリン', // 例
-  text: `ポムポムプリンのかわいいぬいぐるみ、チェック柄エプロンと青い服が特徴です。
+  name: 'クマ', // 例
+  text: `赤いチェック柄のバンダナが可愛い、くまのぬいぐるみキーホルダーです。
 
-- キャラクター名: ポムポムプリン
-- アイテム: ぬいぐるみ
-- デザイン: チェック柄エプロン、青い服
-- サイズ: 約30cm（目安）
+- キャラクター: くま
+- タイプ: ぬいぐるみキーホルダー
+- デザイン: チェック柄バンダナ付き
+- サイズ: 手のひらサイズ
+- 取付け: ボールチェーン付き
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/pom-pom-purin.jpeg', // public/images/smartwatch.jpg を想定
+  imagePreviewUrl: '/images/bear.jpeg',
+};
+
+// Practice mode data (shared between manual and think-aloud experiments)
+export const practiceData: Product = {
+  id: 'practice',
+  name: 'リラックマ',
+  text: `リラックマのぬいぐるみ、黄色いヘルメットと巻物を持った可愛いデザインです。
+
+- キャラクター名: リラックマ
+- アイテム: ぬいぐるみ
+- デザイン: 黄色いヘルメット・巻物付き
+- サイズ: 約23cm（目安）
+- 特徴: やわらかい手触り
+
+ご覧いただきありがとうございます。`,
+  imagePreviewUrl: '/images/rilakkuma.jpeg',
 };
