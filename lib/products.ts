@@ -34,7 +34,6 @@ export interface Product {
 //   imagePreviewUrl: '/images/penguin.jpeg',
 // };
 
-
 export const product1: Product = {
   id: 'product1',
   name: 'ポムポムプリン', // 例
@@ -67,15 +66,14 @@ export const product2: Product = {
 // Practice mode data (shared between manual and think-aloud experiments)
 export const practiceData: Product = {
   id: 'practice',
-  name: 'リラックマ',
-  text: `リラックマのぬいぐるみ、黄色いヘルメットと巻物を持った可愛いデザインです。
+  name: '鉛筆',
+  text: `東京大学のロゴが刻印されたシンプルな黒鉛筆です。勉強や仕事のお供にぴったりです。
 
-- キャラクター名: リラックマ
-- アイテム: ぬいぐるみ
-- デザイン: 黄色いヘルメット・巻物付き
-- サイズ: 約23cm（目安）
-- 特徴: やわらかい手触り
+- ブランド・刻印: 東京大学
+- カラー: ブラック
+- 種類: 鉛筆
+- 特徴: ロゴ入り、シンプルデザイン
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/rilakkuma.jpeg',
+  imagePreviewUrl: '/images/pencil.jpeg',
 };

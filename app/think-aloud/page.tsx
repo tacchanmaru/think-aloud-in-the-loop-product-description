@@ -44,6 +44,7 @@ export default function ThinkAloud() {
   const [transcript, setTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDiff, setShowDiff] = useState(true);
+  const [isDescriptionClicked, setIsDescriptionClicked] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [correctionPhaseApiError, setCorrectionPhaseApiError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
@@ -431,74 +432,55 @@ export default function ThinkAloud() {
                 </div>
                 <div className="relative">
                   <div className="flex justify-between items-center mb-1">
-                    <p className="text-sm font-medium">商品説明文：</p>
-                    <div className="flex bg-gray-300 rounded-full p-1">
-                      <button
-                        onClick={() => setShowDiff(true)}
-                        className={`px-4 py-2 text-xs font-medium rounded-full transition-colors ${
-                          showDiff
-                            ? 'bg-green-500 text-white shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        差分表示
-                      </button>
-                      <button
-                        onClick={() => setShowDiff(false)}
-                        className={`px-4 py-2 text-xs font-medium rounded-full transition-colors ${
-                          !showDiff
-                            ? 'bg-green-500 text-white shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        現在の文章のみ
-                      </button>
-                    </div>
+                    <p className="text-sm font-medium">商品説明文：（クリックで現在の文章のみ表示）</p>
+                    {!isDescriptionClicked && (
+                      <div className="flex gap-4 text-xs">
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-green-100 border rounded"></div>
+                          <span>追加された行</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-red-100 border rounded"></div>
+                          <span>削除された行</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-white border rounded"></div>
+                          <span>変更なし</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div
                     ref={descriptionDisplayRef}
-                    className="border rounded-md p-3 min-h-[7.5em] bg-white"
+                    className="border rounded-md p-3 min-h-[7.5em] bg-white cursor-pointer select-none"
+                    onMouseDown={() => setIsDescriptionClicked(true)}
+                    onMouseUp={() => setIsDescriptionClicked(false)}
+                    onMouseLeave={() => setIsDescriptionClicked(false)}
                   >
                     {textForCorrection ? (
-                      showDiff ? (
-                        <div>
-                          <div className="mb-2 flex gap-4 text-xs">
-                            <div className="flex items-center gap-1">
-                              <div className="w-3 h-3 bg-green-100 border rounded"></div>
-                              <span>追加された行</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <div className="w-3 h-3 bg-red-100 border rounded"></div>
-                              <span>削除された行</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <div className="w-3 h-3 bg-white border rounded"></div>
-                              <span>変更なし</span>
-                            </div>
-                          </div>
-                          <div className="whitespace-pre-line break-words text-base">
-                            {getPreviousText() ? (
-                              calculateLineDiff(getPreviousText() || '', textForCorrection).map((line, index) => (
-                                <div
-                                  key={index}
-                                  className={`${
-                                    line.type === 'added'
-                                      ? 'bg-green-100'
-                                      : line.type === 'removed'
-                                      ? 'bg-red-100'
-                                      : 'bg-white'
-                                  } ${line.content.trim() === '' ? 'min-h-[1em]' : ''}`}
-                                >
-                                  {line.content || '\u00A0'}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="whitespace-pre-line break-words text-base">{textForCorrection}</div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
+                      isDescriptionClicked ? (
                         <div className="whitespace-pre-line break-words text-base">{textForCorrection}</div>
+                      ) : (
+                        <div className="whitespace-pre-line break-words text-base">
+                          {getPreviousText() ? (
+                            calculateLineDiff(getPreviousText() || '', textForCorrection).map((line, index) => (
+                              <div
+                                key={index}
+                                className={`${
+                                  line.type === 'added'
+                                    ? 'bg-green-100'
+                                    : line.type === 'removed'
+                                    ? 'bg-red-100'
+                                    : 'bg-white'
+                                } ${line.content.trim() === '' ? 'min-h-[1em]' : ''}`}
+                              >
+                                {line.content || '\u00A0'}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="whitespace-pre-line break-words text-base">{textForCorrection}</div>
+                          )}
+                        </div>
                       )
                     ) : (
                       <span className="text-muted-foreground">ここに商品説明が表示されます...</span>
