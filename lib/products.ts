@@ -6,63 +6,63 @@ export interface Product {
   imagePreviewUrl: string | null; // publicディレクトリからのパス
 }
 
-// export const product1: Product = {
-//   id: 'product1',
-//   name: 'フェレット', // 例
-//   text: `かわいい白いフェレットのぬいぐるみ。ふわふわの手触りで、デスクやお部屋のインテリアにもおすすめです。
-
-// - 種類: フェレット
-// - カラー: ホワイト
-// - サイズ: 約20cm
-// - 特徴: 立ち姿、ひげ付き、柔らかい手触り
-
-// ご覧いただきありがとうございます。`,
-//   imagePreviewUrl: '/images/ferret.jpeg',
-// };
-
-// export const product2: Product = {
-//   id: 'product2',
-//   name: 'ペンギン', // 例
-//   text: `ふわふわのペンギンのぬいぐるみ。やわらかい手触りで、お子様やギフトにもぴったりです。
-
-// - アイテム: ペンギンのぬいぐるみ
-// - カラー: グレー×ホワイト
-// - サイズ: 約20cm
-// - 特徴: ふわふわ素材、丸いフォルム
-
-// ご覧いただきありがとうございます。`,
-//   imagePreviewUrl: '/images/penguin.jpeg',
-// };
-
 export const product1: Product = {
   id: 'product1',
-  name: 'バッグ', // 例
-  text: `東京大学のロゴが印象的なシンプルなトートバッグ。A4サイズの書類やノートがすっきり入る大きさです。
+  name: 'フェレット', // 例
+  text: `かわいい白いフェレットのぬいぐるみ。ふわふわの手触りで、デスクやお部屋のインテリアにもおすすめです。
 
-- デザイン: 東京大学ロゴ入り（プリントは紙をテープで固定）
-- カラー: ナチュラル（生成り）
-- 素材: キャンバス地
-- サイズ: A4対応
-- 持ち手: 肩掛け可能
+- 種類: フェレット
+- カラー: ホワイト
+- サイズ: 約20cm
+- 特徴: 立ち姿、ひげ付き、柔らかい手触り
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/bag.jpeg',
+  imagePreviewUrl: '/images/ferret.jpeg',
 };
 
 export const product2: Product = {
   id: 'product2',
-  name: 'バッグ', // 例
-  text: `東京大学のロゴが印象的なシンプルなトートバッグ。A4サイズの書類やノートがすっきり入る大きさです。
+  name: 'ペンギン', // 例
+  text: `ふわふわのペンギンのぬいぐるみ。やわらかい手触りで、お子様やギフトにもぴったりです。
 
-- デザイン: 東京大学ロゴ入り（プリントは紙をテープで固定）
-- カラー: ナチュラル（生成り）
-- 素材: キャンバス地
-- サイズ: A4対応
-- 持ち手: 肩掛け可能
+- アイテム: ペンギンのぬいぐるみ
+- カラー: グレー×ホワイト
+- サイズ: 約20cm
+- 特徴: ふわふわ素材、丸いフォルム
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/bag.jpeg',
+  imagePreviewUrl: '/images/penguin.jpeg',
 };
+
+// export const product1: Product = {
+//   id: 'product1',
+//   name: 'バッグ', // 例
+//   text: `東京大学のロゴが印象的なシンプルなトートバッグ。A4サイズの書類やノートがすっきり入る大きさです。
+
+// - デザイン: 東京大学ロゴ入り（プリントは紙をテープで固定）
+// - カラー: ナチュラル（生成り）
+// - 素材: キャンバス地
+// - サイズ: A4対応
+// - 持ち手: 肩掛け可能
+
+// ご覧いただきありがとうございます。`,
+//   imagePreviewUrl: '/images/bag.jpeg',
+// };
+
+// export const product2: Product = {
+//   id: 'product2',
+//   name: 'バッグ', // 例
+//   text: `東京大学のロゴが印象的なシンプルなトートバッグ。A4サイズの書類やノートがすっきり入る大きさです。
+
+// - デザイン: 東京大学ロゴ入り（プリントは紙をテープで固定）
+// - カラー: ナチュラル（生成り）
+// - 素材: キャンバス地
+// - サイズ: A4対応
+// - 持ち手: 肩掛け可能
+
+// ご覧いただきありがとうございます。`,
+//   imagePreviewUrl: '/images/bag.jpeg',
+// };
 
 // Practice mode data (shared between manual and think-aloud experiments)
 export const practiceData: Product = {
