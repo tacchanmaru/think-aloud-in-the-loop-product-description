@@ -36,31 +36,32 @@ export interface Product {
 
 export const product1: Product = {
   id: 'product1',
-  name: 'ポムポムプリン', // 例
-  text: `ポムポムプリンのぬいぐるみ、黄色のギンガムチェック柄バンダナと青いオーバーオールが可愛いデザインです。
+  name: 'バッグ', // 例
+  text: `東京大学のロゴが印象的なシンプルなトートバッグ。A4サイズの書類やノートがすっきり入る大きさです。
 
-- キャラクター名: ポムポムプリン
-- スタイル: ぬいぐるみ
-- デザイン: ギンガムチェック柄バンダナ、青いオーバーオール付き
-- サイズ: 約30cm（目安）
+- デザイン: 東京大学ロゴ入り（プリントは紙をテープで固定）
+- カラー: ナチュラル（生成り）
+- 素材: キャンバス地
+- サイズ: A4対応
+- 持ち手: 肩掛け可能
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/pom-pom-purin.jpeg',
+  imagePreviewUrl: '/images/bag.jpeg',
 };
 
 export const product2: Product = {
   id: 'product2',
-  name: 'クマ', // 例
-  text: `赤いチェック柄のバンダナが可愛い、くまのぬいぐるみキーホルダーです。
+  name: 'バッグ', // 例
+  text: `東京大学のロゴが印象的なシンプルなトートバッグ。A4サイズの書類やノートがすっきり入る大きさです。
 
-- キャラクター: くま
-- タイプ: ぬいぐるみキーホルダー
-- デザイン: チェック柄バンダナ付き
-- サイズ: 手のひらサイズ
-- 取付け: ボールチェーン付き
+- デザイン: 東京大学ロゴ入り（プリントは紙をテープで固定）
+- カラー: ナチュラル（生成り）
+- 素材: キャンバス地
+- サイズ: A4対応
+- 持ち手: 肩掛け可能
 
 ご覧いただきありがとうございます。`,
-  imagePreviewUrl: '/images/bear.jpeg',
+  imagePreviewUrl: '/images/bag.jpeg',
 };
 
 // Practice mode data (shared between manual and think-aloud experiments)
