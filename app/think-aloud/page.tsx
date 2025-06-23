@@ -43,7 +43,6 @@ export default function ThinkAloud() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showDiff, setShowDiff] = useState(true);
   const [isDescriptionClicked, setIsDescriptionClicked] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [correctionPhaseApiError, setCorrectionPhaseApiError] = useState<string | null>(null);
@@ -57,7 +56,7 @@ export default function ThinkAloud() {
   
 
   const audioRecorderRef = useRef<RealtimeAudioRecorder | null>(null);
-  const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string }>>([]);
+  const [history, setHistory] = useState<Array<{ utterance: string; edit_plan: string; modified_text: string; history_summary?: string }>>([]);
   const suggestionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const descriptionDisplayRef = useRef<HTMLDivElement>(null);
 
@@ -82,19 +81,59 @@ export default function ThinkAloud() {
         setSuggestion(`あなたの発話「${utterance}」に対する修正は行いません。`);
         setTranscript(utterance);
         setProcessingUtterance(null); // Clear processing utterance
+        // no_edit_neededの場合もhistoryに追加
+        setHistory(prev => {
+          const currentText = prev.length > 0 ? prev[prev.length - 1].modified_text : textForCorrection;
+          const noEditStep = {
+            utterance: utterance,
+            edit_plan: "修正不要",
+            modified_text: currentText, // 最新のテキストを使用
+            history_summary: data.history_summary
+          };
+          console.log(`[${receivedTime}] Adding no_edit_needed step with history_summary:`, data.history_summary);
+          return [...prev, noEditStep];
+        });
         if (data.history_summary) {
           console.log(`[${receivedTime}] Current constraints:`, data.history_summary);
         }
       } else if (data.type === 'text_modified') {
         setTextForCorrection(data.modified_text);
         setTranscript(data.utterance);
-        setHistory(data.history);
+        // バックエンドの最新ステップのみを既存のhistoryにappend
+        setHistory(prev => {
+          if (data.history && data.history.length > 0) {
+            const latestBackendStep = data.history[data.history.length - 1];
+            const newStep = {
+              utterance: latestBackendStep.utterance,
+              edit_plan: latestBackendStep.edit_plan,
+              modified_text: latestBackendStep.modified_text,
+              history_summary: data.history_summary
+            };
+            console.log(`[${receivedTime}] Appending latest backend step with history_summary:`, data.history_summary);
+            return [...prev, newStep];
+          }
+          return prev;
+        });
         if (data.history_summary) {
           console.log(`[${receivedTime}] Updated constraints:`, data.history_summary);
         }
         setHasModification(true);
         setShowEditingReflection(false); // Hide "編集反映中"
         setProcessingUtterance(null); // Clear processing utterance
+      } else if (data.type === 'history_summary_updated') {
+        // 最新のIntermediateStepのhistory_summaryを更新
+        setHistory(prev => {
+          if (prev.length > 0) {
+            const updatedHistory = [...prev];
+            updatedHistory[updatedHistory.length - 1] = {
+              ...updatedHistory[updatedHistory.length - 1],
+              history_summary: data.history_summary
+            };
+            console.log(`[${receivedTime}] Updated history_summary for latest step:`, data.history_summary);
+            return updatedHistory;
+          }
+          return prev;
+        });
       } else if (data.type === 'processing_started') {
         console.log(`[${receivedTime}] Processing started for utterance:`, data.utterance);
         setProcessingUtterance(data.utterance);

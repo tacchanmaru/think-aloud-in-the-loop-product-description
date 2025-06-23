@@ -5,6 +5,7 @@ export interface IntermediateStep {
   utterance: string;
   edit_plan: string; // AIによる修正提案や計画
   modified_text: string; // AIによって実際に修正されたテキスト
+  history_summary?: string; // その時点での制約や履歴の要約
 }
 
 // Firebaseに保存する基本データ構造
